@@ -1,7 +1,7 @@
 import asyncio
 from playwright.async_api import async_playwright
 
-from scrapers import elfsight, nudefloor
+from scrapers import elfsight, nudefloor, studio808
 from scrapers import normalize
 from scrapers.db import (
     seed_studios,
@@ -11,7 +11,7 @@ from scrapers.db import (
     insert_classes,
 )
 
-ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE]
+ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES
 
 
 def _build_class_rows(studio_data, instructor_map, run_id, is_caps):
@@ -62,6 +62,13 @@ async def main():
             errors.append(f"nudefloor: {e}")
             print(f"  Nude Floor ERROR: {e}")
 
+        # ── 808 Studio — Mindbody (ALL CAPS source) ─────────────────────────
+        studio808_results = await studio808.scrape_all(page)
+        for studio_data in studio808_results:
+            if studio_data.get("error"):
+                errors.append(f"{studio_data['id']}: {studio_data['error']}")
+            all_rows += _build_class_rows(studio_data, {}, run_id, is_caps=True)
+
         await browser.close()
 
     # Upsert all unique instructor names in one round-trip, then patch IDs
@@ -80,7 +87,7 @@ async def main():
     print(f"Status : {status}")
     print(f"Run ID : {run_id}")
     print(f"Classes: {len(all_rows)}")
-    for s in elfsight_results:
+    for s in elfsight_results + studio808_results:
         branch = f" ({s['branch']})" if s.get("branch") else ""
         flag = " ⚠" if s.get("error") else ""
         print(f"  {s['name']}{branch}: {len(s['classes'])}{flag}")

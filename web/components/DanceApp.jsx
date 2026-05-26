@@ -57,6 +57,7 @@ function studioColor(id) {
   if (id.startsWith('zero'))  return T.accent;
   if (id === 'playground')    return T.secondary;
   if (id === 'nudefloor')     return T.tertiary;
+  if (id.startsWith('808'))   return '#b39dff'; // 808 Studio — lavender
   return T.textDim;
 }
 function studioLoc(s) {
