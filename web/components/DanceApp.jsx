@@ -748,16 +748,44 @@ function Checkbox({ on }) {
 }
 
 function Sheet({ onClose, title, children }) {
+  const [dragY, setDragY] = useState(0);
+  const startRef = useRef(null);
+  const panelRef = useRef(null);
+
+  const handleTouchStart = e => {
+    startRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const handleTouchMove = e => {
+    if (!startRef.current) return;
+    const panel = panelRef.current;
+    if (panel && panel.scrollTop > 0) return;
+    const dx = e.touches[0].clientX - startRef.current.x;
+    const dy = e.touches[0].clientY - startRef.current.y;
+    if (dy > 0 && dy > Math.abs(dx)) setDragY(dy);
+  };
+  const handleTouchEnd = () => {
+    if (dragY > 80) { onClose(); } else { setDragY(0); }
+    startRef.current = null;
+  };
+
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}/>
-      <div style={{
-        position: 'relative', background: T.bgSoft,
-        borderTop: '1px solid ' + T.borderStrong,
-        borderTopLeftRadius: 22, borderTopRightRadius: 22,
-        paddingBottom: 22, maxHeight: '82%', overflowY: 'auto',
-        boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
-      }}>
+      <div
+        ref={panelRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          position: 'relative', background: T.bgSoft,
+          borderTop: '1px solid ' + T.borderStrong,
+          borderTopLeftRadius: 22, borderTopRightRadius: 22,
+          paddingBottom: 22, maxHeight: '82%', overflowY: 'auto',
+          boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
+          transform: `translateY(${dragY}px)`,
+          transition: dragY === 0 ? 'transform .3s cubic-bezier(.2,.7,.3,1)' : 'none',
+          willChange: 'transform',
+        }}>
         <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 6px' }}>
           <div style={{ width: 36, height: 4, borderRadius: 2, background: T.borderStrong }}/>
         </div>
@@ -785,6 +813,8 @@ function DatePicker({ TODAY, month, setMonth, selected, dateCount, onPick, onClo
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
   while (cells.length % 7 !== 0) cells.push(null);
 
+  const swipeRef = useRef(null);
+
   return (
     <Sheet onClose={onClose} title={MONTHS[month.getMonth()] + ' ' + month.getFullYear()}>
       <div style={{ padding: '0 22px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -800,7 +830,22 @@ function DatePicker({ TODAY, month, setMonth, selected, dateCount, onPick, onClo
           <Icon.chevR/>
         </button>
       </div>
-      <div style={{ padding: '0 16px 18px' }}>
+      <div
+        style={{ padding: '0 16px 18px' }}
+        onTouchStart={e => {
+          swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }}
+        onTouchEnd={e => {
+          if (!swipeRef.current) return;
+          const dx = e.changedTouches[0].clientX - swipeRef.current.x;
+          const dy = e.changedTouches[0].clientY - swipeRef.current.y;
+          swipeRef.current = null;
+          if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+            if (dx < 0) setMonth(new Date(month.getFullYear(), month.getMonth()+1, 1));
+            else        setMonth(new Date(month.getFullYear(), month.getMonth()-1, 1));
+          }
+        }}
+      >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4, marginBottom: 6, textAlign: 'center' }}>
           {DOW.map(d => <div key={d} style={{ fontSize: 10.5, color: T.textMute, padding: '6px 0', fontWeight: 500 }}>{d}</div>)}
         </div>
@@ -883,6 +928,7 @@ function SearchTab({ isDesktop, query, setQuery, classes, studios, onOpenClass }
         }}>
           <span style={{ color: T.accent, display: 'inline-flex' }}><Icon.search s={16}/></span>
           <input
+            autoFocus
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Class, instructor, or studio"
@@ -1099,6 +1145,26 @@ function ContactRow({ icon, label }) {
 // ─────────────────────────────────────────────────────────────
 function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
   const info = instrInfo || {};
+  const [dragY, setDragY] = useState(0);
+  const startRef = useRef(null);
+  const scrollRef = useRef(null);
+
+  const handleTouchStart = e => {
+    startRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  };
+  const handleTouchMove = e => {
+    if (!startRef.current) return;
+    const scroll = scrollRef.current;
+    if (scroll && scroll.scrollTop > 0) return;
+    const dx = e.touches[0].clientX - startRef.current.x;
+    const dy = e.touches[0].clientY - startRef.current.y;
+    if (dy > 0 && dy > Math.abs(dx)) setDragY(dy);
+  };
+  const handleTouchEnd = () => {
+    if (dragY > 80) { onClose(); } else { setDragY(0); }
+    startRef.current = null;
+  };
+
   const [y, mo, da] = c.date.split('-').map(Number);
   const d = new Date(y, mo-1, da);
   const isToday   = sameDay(d, TODAY);
@@ -1110,6 +1176,17 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 60, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}/>
+      {/* Drag wrapper — translates on swipe without fighting the snsIn mount animation */}
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{
+          transform: `translateY(${dragY}px)`,
+          transition: dragY === 0 ? 'transform .3s cubic-bezier(.2,.7,.3,1)' : 'none',
+          willChange: 'transform',
+        }}
+      >
       <div style={{
         position: 'relative', background: T.bgSoft,
         borderTop: '1px solid ' + T.borderStrong,
@@ -1123,15 +1200,14 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
         </div>
         <button onClick={onClose} aria-label="Close" style={{
           position: 'absolute', top: 14, right: 14, zIndex: 2,
-          width: 34, height: 34, borderRadius: 999,
-          background: hexA('#000', 0.45), border: '1px solid ' + T.borderStrong,
-          color: T.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backdropFilter: 'blur(6px)',
+          background: 'transparent', border: 0,
+          color: T.textDim, cursor: 'pointer', padding: 4,
+          display: 'flex', alignItems: 'center',
         }}>
-          <Icon.x s={16}/>
+          <Icon.x s={18}/>
         </button>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 26px' }}>
+        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto', padding: '8px 18px 26px' }}>
           <StudioPhoto studio={studio} />
 
           <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: T.accent, fontWeight: 500, flexWrap: 'wrap' }}>
@@ -1205,6 +1281,7 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
           </div>
         </div>
       </div>
+      </div>{/* end drag wrapper */}
     </div>
   );
 }
