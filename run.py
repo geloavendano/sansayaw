@@ -1,4 +1,7 @@
 import asyncio
+import os
+import urllib.request
+
 from playwright.async_api import async_playwright
 
 from scrapers import elfsight, nudefloor, studio808
@@ -12,6 +15,26 @@ from scrapers.db import (
 )
 
 ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES
+
+
+def _revalidate_frontend():
+    """POST to the Next.js revalidation webhook to bust the ISR cache."""
+    url = os.getenv("NEXT_PUBLIC_SITE_URL", "https://sansayaw.org")
+    secret = os.getenv("REVALIDATE_SECRET", "")
+    if not secret:
+        print("  [revalidate] Skipping — REVALIDATE_SECRET not set")
+        return
+    try:
+        req = urllib.request.Request(
+            f"{url}/api/revalidate",
+            data=b"",
+            method="POST",
+            headers={"x-revalidate-secret": secret},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"  [revalidate] Cache busted — {resp.status} {resp.read().decode()}")
+    except Exception as e:
+        print(f"  [revalidate] WARNING: could not bust cache: {e}")
 
 
 def _build_class_rows(studio_data, instructor_map, run_id, is_caps):
@@ -103,6 +126,9 @@ async def main():
     core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc"))]
     status = "partial" if core_errors else "success"
     finish_scrape_run(run_id, status)
+
+    # Bust the Next.js ISR cache so the frontend shows fresh data immediately
+    _revalidate_frontend()
 
     print(f"\n{'─'*50}")
     print(f"Status : {status}")
