@@ -58,6 +58,7 @@ async def main():
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
             viewport={"width": 1280, "height": 900},
+            timezone_id="Asia/Manila",  # Elfsight renders times in browser TZ; force PHT
         )
         page = await context.new_page()
 
