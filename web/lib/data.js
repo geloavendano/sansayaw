@@ -16,7 +16,7 @@ async function fetchAppData() {
   const db = createServerClient();
 
   const [runsRes, studiosRes, instrsRes] = await Promise.all([
-    db.from('scrape_runs').select('id, scraped_at').eq('status', 'success').order('id', { ascending: false }).limit(1),
+    db.from('scrape_runs').select('id, scraped_at').in('status', ['success', 'partial']).order('id', { ascending: false }).limit(1),
     db.from('studios').select('*').order('name'),
     db.from('instructors').select('*'),
   ]);

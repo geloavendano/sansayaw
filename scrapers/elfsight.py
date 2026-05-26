@@ -1,23 +1,29 @@
+import os
 import re
-from datetime import datetime, timezone as _tz
+from datetime import datetime
 
 # ── Timezone correction ───────────────────────────────────────────────────────
 # Elfsight uses IP-geolocation for timezone detection, not the browser JS clock.
 # GitHub Actions IPs resolve to UTC, so scraped times are always UTC regardless
-# of browser flags. We correct by adding (PHT_OFFSET − system_utc_offset) hours:
-#   • On GitHub Actions (UTC+0): correction = +8  → times become PHT ✓
-#   • On a Philippine dev machine (UTC+8): correction = 0  → unchanged ✓
+# of browser flags. We detect CI explicitly rather than inferring from the
+# system timezone (which can be unreliable depending on environment variables).
 #
-# Proof: run #4 (scraped with the original bare Playwright setup, no special
-# flags) shows "05:00 AM – 06:30 AM" for classes that dance studios schedule
-# in the afternoon/evening — consistently 8 hours behind PHT.
+# Proof: run #4 (bare Playwright, no special flags) and run #10 (with user-agent
+# + viewport) both stored times like "05:00 AM – 06:30 AM" for classes that
+# Manila dance studios schedule in the afternoon/evening — consistently UTC.
 
 _PHT_OFFSET_H = 8
 
 
 def _pht_correction():
-    sys_offset = datetime.now(_tz.utc).astimezone().utcoffset().total_seconds() / 3600
-    return round(_PHT_OFFSET_H - sys_offset)
+    """
+    Return hours to add to convert Elfsight UTC times to PHT.
+    GITHUB_ACTIONS=true is always set by GitHub-hosted runners → +8h.
+    Assumed PHT (UTC+8) locally → 0h.
+    """
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        return _PHT_OFFSET_H
+    return 0
 
 
 def _shift_time_range(time_str, hours):
@@ -119,6 +125,7 @@ def parse_text(raw_text, tz_correction=None):
     """
     if tz_correction is None:
         tz_correction = _pht_correction()
+        print(f"    [tz] Elfsight correction: +{tz_correction}h (GITHUB_ACTIONS={os.getenv('GITHUB_ACTIONS')!r})")
     lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
     classes = []
     today = datetime.now()
