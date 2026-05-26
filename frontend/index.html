@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>sa'nsayaw · MNL dance classes</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+  <meta name="description" content="Metro Manila dance class schedule aggregator. Find open classes at Zero Studio, The Playground Studios, and Nude Floor."/>
+  <meta name="theme-color" content="#0a1820"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+
+  <!-- Open Graph — controls how the link looks when shared on FB, Instagram, iMessage, Viber, etc. -->
+  <meta property="og:type"        content="website"/>
+  <meta property="og:site_name"   content="sa'nsayaw"/>
+  <meta property="og:title"       content="sa'nsayaw · MNL dance classes"/>
+  <meta property="og:description" content="One place to find every open dance class in Metro Manila. Schedules from Zero Studio, The Playground, and Nude Floor — updated daily."/>
+  <meta property="og:url"         content="https://sansayaw.ph"/>
+  <!-- og:image — replace with a real 1200×630 cover image when you have one -->
+  <!-- <meta property="og:image" content="https://sansayaw.ph/og-cover.png"/> -->
+
+  <!-- Twitter / X card -->
+  <meta name="twitter:card"        content="summary"/>
+  <meta name="twitter:title"       content="sa'nsayaw · MNL dance classes"/>
+  <meta name="twitter:description" content="One place to find every open dance class in Metro Manila. Updated daily."/>
+
+  <!-- Canonical URL (tell Google which URL is authoritative) -->
+  <link rel="canonical" href="https://sansayaw.ph"/>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+
+  <style>
+    html, body {
+      margin: 0; padding: 0;
+      background: #0a1820; color: #eaf6f7;
+      font-family: 'Geist', 'Helvetica Neue', sans-serif;
+      overscroll-behavior: none;
+    }
+    * { box-sizing: border-box; }
+    ::-webkit-scrollbar { display: none; }
+    button { font-family: inherit; }
+    input { font-family: inherit; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<script type="text/babel" src="app.jsx" data-presets="env,react"></script>
+
+<script type="text/babel" data-presets="env,react">
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
