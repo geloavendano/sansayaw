@@ -1,51 +1,5 @@
 import re
-from datetime import datetime, timezone as _tz
-
-# ── Timezone correction ───────────────────────────────────────────────────────
-# Elfsight renders event times using the IP-geolocation timezone of the
-# requesting machine.  On GitHub Actions (UTC) this differs from PHT (UTC+8),
-# so scraped times are 8 hours behind.  We correct by computing:
-#   correction = PHT_OFFSET − system_utc_offset
-# On a Philippine dev machine (already UTC+8) the result is 0 — no change.
-# On GitHub Actions (UTC) the result is +8 — times are shifted to PHT.
-
-_PHT_OFFSET_H = 8
-
-
-def _system_utc_offset_hours():
-    return datetime.now(_tz.utc).astimezone().utcoffset().total_seconds() / 3600
-
-
-def _pht_correction():
-    return round(_PHT_OFFSET_H - _system_utc_offset_hours())
-
-
-def _shift_time_range(time_str, hours):
-    """
-    Shift every clock component in a range string by `hours`.
-    '11:00 AM - 12:30 PM' + 8 → '7:00 PM – 8:30 PM'
-    Returns the string unchanged when hours == 0.
-    """
-    if not time_str or hours == 0:
-        return time_str
-
-    def _shift_one(t, h):
-        m = re.match(r'(\d{1,2}):(\d{2})\s*(AM|PM)', t.strip(), re.IGNORECASE)
-        if not m:
-            return t
-        hr, mn = int(m.group(1)), int(m.group(2))
-        ap = m.group(3).upper()
-        if ap == 'PM' and hr != 12:
-            hr += 12
-        if ap == 'AM' and hr == 12:
-            hr = 0
-        hr = (hr + h) % 24
-        new_ap = 'PM' if hr >= 12 else 'AM'
-        new_hr = hr % 12 or 12
-        return f"{new_hr}:{mn:02d} {new_ap}"
-
-    parts = re.split(r'\s*[–\-]\s*', time_str, maxsplit=1)
-    return ' – '.join(_shift_one(p, hours) for p in parts)
+from datetime import datetime
 
 
 MONTHS = {
@@ -104,7 +58,7 @@ def _split_instructor(title):
     return None, title
 
 
-def parse_text(raw_text, tz_correction=None):
+def parse_text(raw_text):
     """
     Parse Elfsight Events Calendar rendered text into a list of class dicts.
 
@@ -116,13 +70,7 @@ def parse_text(raw_text, tz_correction=None):
         HH:MM AM - HH:MM PM
         [VENUE]           ← optional
         REGISTER ...      ← button text, marks end of block
-
-    tz_correction: hours to add to scraped times to convert them to PHT.
-                   Defaults to _pht_correction() (auto-detected from system TZ).
     """
-    if tz_correction is None:
-        tz_correction = _pht_correction()
-
     lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
     classes = []
     today = datetime.now()
@@ -202,7 +150,7 @@ def parse_text(raw_text, tz_correction=None):
             "instructor": instructor,
             "class_name": class_name,
             "genre": genre,
-            "time": _shift_time_range(time_str, tz_correction),
+            "time": time_str,
             "venue": venue,
         })
 

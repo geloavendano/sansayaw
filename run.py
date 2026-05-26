@@ -48,7 +48,11 @@ async def main():
             args=[
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled",
+                # NOTE: do NOT add --disable-blink-features=AutomationControlled here.
+                # Elfsight checks navigator.webdriver and, when it looks like a real
+                # browser, converts times to the visitor's IP-detected timezone (UTC on
+                # GitHub Actions). When detected as automation it serves absolute PHT
+                # times from the widget config — which is what we want.
             ]
         )
         context = await browser.new_context(
@@ -58,7 +62,6 @@ async def main():
                 "Chrome/124.0.0.0 Safari/537.36"
             ),
             viewport={"width": 1280, "height": 900},
-            timezone_id="Asia/Manila",  # Elfsight renders times in browser TZ; force PHT
         )
         page = await context.new_page()
 
