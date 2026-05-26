@@ -128,14 +128,20 @@ async def scrape(page, site):
     except Exception:
         pass
 
-    # Extra buffer for the widget JS to populate class rows
-    await page.wait_for_timeout(5000)
-
     widget = page.locator(".bw-widget")
     if await widget.count() == 0:
         raise Exception("Mindbody widget (.bw-widget) not found — page may have blocked the scraper")
 
-    raw_text = await widget.inner_text()
+    # Poll until the AJAX session data has populated (CI can be slow).
+    # We look for a time-range line inside the widget text as proof of content.
+    TIME_LOADED_RE = re.compile(r"\d{1,2}:\d{2}\s*[AP]M\s*[–\-]\s*\d{1,2}:\d{2}\s*[AP]M", re.IGNORECASE)
+    for _ in range(12):  # up to ~24 s in 2 s increments
+        raw_text = await widget.inner_text()
+        if TIME_LOADED_RE.search(raw_text):
+            break
+        await page.wait_for_timeout(2000)
+    else:
+        raw_text = await widget.inner_text()
 
     classes = parse_text(raw_text)
     print(f"    → {len(classes)} classes found")
