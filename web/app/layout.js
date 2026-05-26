@@ -17,14 +17,14 @@ export const metadata = {
   title: "sa'nsayaw · MNL dance classes",
   description:
     'Metro Manila dance class schedule aggregator. Find open classes at Zero Studio, The Playground Studios, and Nude Floor. Updated daily.',
-  metadataBase: new URL('https://sansayaw.ph'),
+  metadataBase: new URL('https://sansayaw.org'),
   openGraph: {
     type: 'website',
     siteName: "sa'nsayaw",
     title: "sa'nsayaw · MNL dance classes",
     description:
       'One place to find every open dance class in Metro Manila. Schedules from Zero Studio, The Playground, and Nude Floor — updated daily.',
-    url: 'https://sansayaw.ph',
+    url: 'https://sansayaw.org',
   },
   twitter: {
     card: 'summary',
@@ -32,7 +32,7 @@ export const metadata = {
     description: 'One place to find every open dance class in Metro Manila. Updated daily.',
   },
   alternates: {
-    canonical: 'https://sansayaw.ph',
+    canonical: 'https://sansayaw.org',
   },
 };
 
