@@ -2,8 +2,6 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 
-// ── InstaPay QR — set to image URL (hosted or base64 data URI) when ready
-// e.g. const INSTAPAY_QR_URL = "https://sansayaw.ph/qr.png";
 const INSTAPAY_QR_URL = '/instapay-qr.jpg';
 
 // ── THEME (Neon City) ────────────────────────────────────────
@@ -29,6 +27,9 @@ const T = {
   radius:       10,
   pill:         999,
 };
+
+// ── TAB ORDER (used for swipe direction) ─────────────────────
+const TAB_ORDER = ['calendar', 'search', 'contact'];
 
 // ── DATE HELPERS ─────────────────────────────────────────────
 const MONTHS  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -88,7 +89,6 @@ function placeholderGrad(seed, kind='studio') {
 
 // ── HOOKS ────────────────────────────────────────────────────
 function useWindowWidth() {
-  // Start null to avoid SSR/hydration mismatch; effects run only client-side
   const [w, setW] = useState(null);
   useEffect(() => {
     setW(window.innerWidth);
@@ -97,6 +97,27 @@ function useWindowWidth() {
     return () => window.removeEventListener('resize', h);
   }, []);
   return w;
+}
+
+// Tracks how far the keyboard has pushed up from the bottom
+// so the floating nav can stay visible above it.
+function useKeyboardOffset() {
+  const [offset, setOffset] = useState(0);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const kb = Math.max(0, window.innerHeight - vv.offsetTop - vv.height);
+      setOffset(kb);
+    };
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    return () => {
+      vv.removeEventListener('resize', update);
+      vv.removeEventListener('scroll', update);
+    };
+  }, []);
+  return offset;
 }
 
 // ── ICONS ────────────────────────────────────────────────────
@@ -120,21 +141,80 @@ const Icon = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// DANCE APP  (receives pre-fetched data from the Server Component)
+// ANIMATED BACKGROUND BLOBS
+// ─────────────────────────────────────────────────────────────
+function BgBlobs() {
+  return (
+    <div aria-hidden="true" style={{
+      position: 'fixed', inset: 0, zIndex: 0,
+      overflow: 'hidden', pointerEvents: 'none',
+    }}>
+      {/* Accent cyan — top right, slow drift */}
+      <div style={{
+        position: 'absolute', borderRadius: '50%',
+        width: 600, height: 600,
+        top: '-15%', right: '-10%',
+        background: hexA(T.accent, 0.09),
+        filter: 'blur(90px)',
+        animation: 'blobDrift1 22s ease-in-out infinite',
+      }}/>
+      {/* Pink — bottom left */}
+      <div style={{
+        position: 'absolute', borderRadius: '50%',
+        width: 500, height: 500,
+        bottom: '-10%', left: '-12%',
+        background: hexA(T.secondary, 0.08),
+        filter: 'blur(80px)',
+        animation: 'blobDrift2 28s ease-in-out infinite',
+      }}/>
+      {/* Amber — center, smaller */}
+      <div style={{
+        position: 'absolute', borderRadius: '50%',
+        width: 320, height: 320,
+        top: '40%', left: '35%',
+        background: hexA(T.tertiary, 0.055),
+        filter: 'blur(70px)',
+        animation: 'blobDrift3 19s ease-in-out infinite',
+      }}/>
+      {/* Second accent — bottom right */}
+      <div style={{
+        position: 'absolute', borderRadius: '50%',
+        width: 400, height: 400,
+        bottom: '5%', right: '5%',
+        background: hexA(T.accent, 0.06),
+        filter: 'blur(75px)',
+        animation: 'blobDrift4 25s ease-in-out infinite',
+      }}/>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// DANCE APP
 // ─────────────────────────────────────────────────────────────
 export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
   const TODAY     = useMemo(todayLocal, []);
   const w         = useWindowWidth();
   const isDesktop = w !== null && w >= 768;
 
-  const [tab,  setTab]  = useState('calendar');
-  const [date, setDate] = useState(TODAY);
-  const [enabledStudios, setEnabledStudios] = useState(() => new Set(studios.map(s => s.id)));
-  const [showFilter, setShowFilter] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
-  const [pickerMonth, setPickerMonth] = useState(new Date(TODAY));
-  const [query, setQuery] = useState('');
-  const [selClass, setSelClass] = useState(null);
+  const [tab,      setTab]      = useState('calendar');
+  const [slideDir, setSlideDir] = useState(1); // 1 = enter from right, -1 = enter from left
+
+  // Direction-aware tab change
+  const changeTab = (newTab) => {
+    const oldIdx = TAB_ORDER.indexOf(tab);
+    const newIdx = TAB_ORDER.indexOf(newTab);
+    setSlideDir(newIdx >= oldIdx ? 1 : -1);
+    setTab(newTab);
+  };
+
+  const [date, setDate]                       = useState(TODAY);
+  const [enabledStudios, setEnabledStudios]   = useState(() => new Set(studios.map(s => s.id)));
+  const [showFilter, setShowFilter]           = useState(false);
+  const [showPicker, setShowPicker]           = useState(false);
+  const [pickerMonth, setPickerMonth]         = useState(new Date(TODAY));
+  const [query, setQuery]                     = useState('');
+  const [selClass, setSelClass]               = useState(null);
 
   const dateCount = useMemo(() => {
     const c = {};
@@ -172,23 +252,26 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
     <div style={{
       display: 'flex', width: '100%', height: '100svh',
       background: T.bg, color: T.text, fontFamily: T.bodyFont,
-      backgroundImage: `
-        radial-gradient(120% 50% at 80% 0%, ${hexA(T.accent,0.08)} 0%, transparent 60%),
-        radial-gradient(100% 40% at 0% 100%, ${hexA(T.secondary,0.07)} 0%, transparent 60%)
-      `,
+      position: 'relative',
     }}>
+      <BgBlobs />
+
       {/* Desktop sidebar */}
       {isDesktop && (
-        <DesktopSidebar tab={tab} setTab={setTab} lastUpdated={lastUpdated} />
+        <DesktopSidebar tab={tab} changeTab={changeTab} lastUpdated={lastUpdated} />
       )}
 
       {/* Content column */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+      <div style={{
+        flex: 1, position: 'relative', overflow: 'hidden',
+        display: 'flex', flexDirection: 'column', minWidth: 0,
+        zIndex: 1,
+      }}>
 
-        {/* Animated tab content */}
+        {/* Animated tab content — key changes on tab switch, triggering remount + animation */}
         <div key={tab} style={{
           flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          animation: 'tabIn .2s ease',
+          animation: `${slideDir > 0 ? 'slideInRight' : 'slideInLeft'} .22s cubic-bezier(.25,.46,.45,.94)`,
         }}>
           {tab === 'calendar' && (
             <CalendarTab
@@ -215,9 +298,9 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
         </div>
 
         {/* Mobile bottom nav */}
-        {!isDesktop && <BottomNav tab={tab} setTab={setTab} />}
+        {!isDesktop && <BottomNav tab={tab} changeTab={changeTab} />}
 
-        {/* Sheets — absolute over content column only */}
+        {/* Sheets */}
         {showFilter && (
           <FilterSheet
             studios={studios}
@@ -246,71 +329,146 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
       </div>
 
       <style>{`
-        @keyframes tabIn { from { opacity:0; transform:translateY(7px) } to { opacity:1; transform:translateY(0) } }
-        @keyframes snsIn  { from { transform:translateY(24px); opacity:0 } to { transform:translateY(0); opacity:1 } }
+        @keyframes slideInRight {
+          from { opacity: 0; transform: translateX(36px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes slideInLeft {
+          from { opacity: 0; transform: translateX(-36px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes snsIn {
+          from { transform: translateY(24px); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+        @keyframes blobDrift1 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          25%     { transform: translate(6%,   10%)  scale(1.08); }
+          50%     { transform: translate(-4%,  6%)   scale(0.95); }
+          75%     { transform: translate(10%,  -4%)  scale(1.04); }
+        }
+        @keyframes blobDrift2 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          33%     { transform: translate(-8%,  -6%)  scale(1.1);  }
+          66%     { transform: translate(4%,   12%)  scale(0.93); }
+        }
+        @keyframes blobDrift3 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          40%     { transform: translate(-10%, 8%)   scale(1.12); }
+          70%     { transform: translate(8%,  -10%)  scale(0.9);  }
+        }
+        @keyframes blobDrift4 {
+          0%,100% { transform: translate(0%,   0%)   scale(1);    }
+          30%     { transform: translate(-6%,  -8%)  scale(1.06); }
+          60%     { transform: translate(7%,   5%)   scale(0.96); }
+        }
       `}</style>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// DESKTOP SIDEBAR
+// DESKTOP SIDEBAR — editorial / brochure style
 // ─────────────────────────────────────────────────────────────
-function DesktopSidebar({ tab, setTab, lastUpdated }) {
+function DesktopSidebar({ tab, changeTab, lastUpdated }) {
   const items = [
-    { id: 'calendar', label: 'Calendar', I: Icon.cal },
-    { id: 'search',   label: 'Search',   I: Icon.search },
-    { id: 'contact',  label: 'About',    I: Icon.info },
+    { id: 'calendar', label: 'Calendar', sub: 'Browse by date',  I: Icon.cal    },
+    { id: 'search',   label: 'Search',   sub: 'Find a class',    I: Icon.search },
+    { id: 'contact',  label: 'About',    sub: 'Info & support',  I: Icon.info   },
   ];
   return (
     <div style={{
-      width: 'min(35%, 320px)', flex: '0 0 min(35%, 320px)',
+      width: 'min(46%, 420px)', flex: '0 0 min(46%, 420px)',
       display: 'flex', flexDirection: 'column',
-      padding: '32px 20px 28px',
+      padding: '44px 32px 36px',
       borderRight: '1px solid ' + T.border,
-      background: hexA(T.bgSoft, 0.55),
-      backgroundImage: `radial-gradient(80% 50% at 100% 0%, ${hexA(T.accent,0.07)} 0%, transparent 60%)`,
+      background: hexA(T.bgSoft, 0.6),
+      position: 'relative', zIndex: 1,
     }}>
-      <Wordmark />
+      {/* Wordmark */}
+      <div>
+        <div style={{
+          fontFamily: T.headingFont, fontSize: 38, fontWeight: 700,
+          letterSpacing: '-0.03em', lineHeight: 1, color: T.text,
+        }}>
+          sa<span style={{
+            color: T.accent, textShadow: '0 0 20px ' + T.accent,
+          }}>'</span>nsayaw
+        </div>
+        <div style={{
+          marginTop: 8,
+          fontFamily: T.monoFont, fontSize: 11, fontWeight: 500,
+          color: T.textMute, letterSpacing: '.12em', textTransform: 'uppercase',
+        }}>
+          MNL Dance Classes
+        </div>
+        {/* Accent rule */}
+        <div style={{
+          marginTop: 20,
+          width: 40, height: 2,
+          background: `linear-gradient(90deg, ${T.accent}, ${T.secondary})`,
+          borderRadius: 2,
+        }}/>
+      </div>
 
-      <nav style={{ marginTop: 36, display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {/* Nav */}
+      <nav style={{ marginTop: 40, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {items.map(it => {
           const active = tab === it.id;
           return (
-            <button key={it.id} onClick={() => setTab(it.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '11px 14px', borderRadius: T.radius,
+            <button key={it.id} onClick={() => changeTab(it.id)} style={{
+              display: 'flex', alignItems: 'center', gap: 16,
+              padding: '14px 18px', borderRadius: T.radius + 2,
               background: active ? T.accentSoft : 'transparent',
-              border: '1px solid ' + (active ? hexA(T.accent, 0.28) : 'transparent'),
+              border: '1px solid ' + (active ? hexA(T.accent, 0.3) : 'transparent'),
               color: active ? T.accent : T.textDim,
-              fontFamily: T.bodyFont, fontSize: 14, fontWeight: active ? 600 : 500,
-              cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
+              fontFamily: T.bodyFont, cursor: 'pointer', textAlign: 'left',
+              transition: 'all .15s',
             }}>
-              <it.I s={18} w={active ? 2 : 1.6} />
-              <span>{it.label}</span>
+              <div style={{
+                width: 40, height: 40, borderRadius: T.radius,
+                background: active ? hexA(T.accent, 0.15) : T.panel,
+                border: '1px solid ' + (active ? hexA(T.accent, 0.25) : T.border),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flex: '0 0 auto', transition: 'all .15s',
+                color: active ? T.accent : T.textDim,
+              }}>
+                <it.I s={20} w={active ? 2 : 1.6} />
+              </div>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: active ? 700 : 500, lineHeight: 1.2, letterSpacing: '-0.01em' }}>
+                  {it.label}
+                </div>
+                <div style={{ fontSize: 11.5, color: active ? hexA(T.accent, 0.7) : T.textMute, marginTop: 2 }}>
+                  {it.sub}
+                </div>
+              </div>
             </button>
           );
         })}
       </nav>
 
-      <div style={{ marginTop: 'auto', paddingTop: 20 }}>
-        {lastUpdated && (
-          <div style={{
-            padding: '12px 14px', borderRadius: T.radius,
-            background: T.panel, border: '1px solid ' + T.border,
-            marginBottom: 12,
-          }}>
-            <div style={{ fontSize: 10.5, color: T.textMute, fontWeight: 500, letterSpacing: '.05em', textTransform: 'uppercase', marginBottom: 4 }}>
-              Last updated
-            </div>
-            <div style={{ fontSize: 12, color: T.textDim, fontFamily: T.monoFont, lineHeight: 1.5 }}>
-              {formatLastUpdated(lastUpdated)}
-            </div>
+      {/* Spacer */}
+      <div style={{ flex: 1 }} />
+
+      {/* Last updated */}
+      {lastUpdated && (
+        <div style={{
+          padding: '14px 16px', borderRadius: T.radius,
+          background: T.panel, border: '1px solid ' + T.border,
+          marginBottom: 16,
+        }}>
+          <div style={{ fontSize: 10, color: T.textMute, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', marginBottom: 5 }}>
+            Last updated
           </div>
-        )}
-        <div style={{ fontSize: 10.5, color: T.textMute }}>
-          sa'nsayaw · made in Manila
+          <div style={{ fontSize: 12, color: T.textDim, fontFamily: T.monoFont, lineHeight: 1.5 }}>
+            {formatLastUpdated(lastUpdated)}
+          </div>
         </div>
+      )}
+
+      <div style={{ fontSize: 10.5, color: T.textMute, letterSpacing: '.03em' }}>
+        sa'nsayaw · made in Manila
       </div>
     </div>
   );
@@ -619,8 +777,8 @@ function Sheet({ onClose, title, children }) {
 // DATE PICKER
 // ─────────────────────────────────────────────────────────────
 function DatePicker({ TODAY, month, setMonth, selected, dateCount, onPick, onClose }) {
-  const first      = new Date(month.getFullYear(), month.getMonth(), 1);
-  const offset     = first.getDay();
+  const first       = new Date(month.getFullYear(), month.getMonth(), 1);
+  const offset      = first.getDay();
   const daysInMonth = new Date(month.getFullYear(), month.getMonth()+1, 0).getDate();
   const cells = [];
   for (let i = 0; i < offset; i++) cells.push(null);
@@ -725,10 +883,15 @@ function SearchTab({ isDesktop, query, setQuery, classes, studios, onOpenClass }
         }}>
           <span style={{ color: T.accent, display: 'inline-flex' }}><Icon.search s={16}/></span>
           <input
-            autoFocus value={query}
+            value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="Class, instructor, or studio"
-            style={{ flex: 1, background: 'transparent', border: 0, outline: 0, color: T.text, fontFamily: T.bodyFont, fontSize: 14, caretColor: T.accent }}
+            style={{
+              flex: 1, background: 'transparent', border: 0, outline: 0,
+              color: T.text, fontFamily: T.bodyFont,
+              fontSize: 16, // 16px prevents iOS auto-zoom on focus
+              caretColor: T.accent,
+            }}
           />
           {query && (
             <button onClick={() => setQuery('')} style={{ background: 'transparent', border: 0, color: T.textDim, cursor: 'pointer', padding: 0, display: 'flex' }}>
@@ -830,7 +993,6 @@ function ContactTab({ isDesktop, lastUpdated }) {
       <TopBar showWordmark={!isDesktop} />
       <div style={{ flex: 1, overflowY: 'auto' }}>
 
-        {/* About */}
         <div style={{ padding: '10px 18px 26px' }}>
           <div style={{ fontSize: 12, color: T.accent, marginBottom: 10, fontWeight: 500 }}>About sa&apos;nsayaw</div>
           <div style={{ fontFamily: T.headingFont, fontSize: 26, fontWeight: 600, lineHeight: 1.15, letterSpacing: '-0.02em' }}>
@@ -842,7 +1004,6 @@ function ContactTab({ isDesktop, lastUpdated }) {
           </div>
         </div>
 
-        {/* Support */}
         <div style={{ padding: '22px 18px', borderTop: '1px solid ' + T.border }}>
           <SectionLabel>Support the floor</SectionLabel>
           <div style={{ fontFamily: T.headingFont, fontSize: 19, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 10 }}>
@@ -863,24 +1024,10 @@ function ContactTab({ isDesktop, lastUpdated }) {
             ) : (
               <div style={{
                 width: 200, height: 200, borderRadius: T.radius,
-                border: '1px dashed ' + T.borderStrong,
-                background: T.panel,
+                border: '1px dashed ' + T.borderStrong, background: T.panel,
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
               }}>
-                <div style={{
-                  width: 80, height: 80, opacity: .25,
-                  backgroundImage: `linear-gradient(${T.accent} 1px, transparent 1px), linear-gradient(90deg, ${T.accent} 1px, transparent 1px)`,
-                  backgroundSize: '10px 10px',
-                  borderRadius: 4, border: '2px solid ' + T.accent,
-                }}/>
-                <div style={{ textAlign: 'center', padding: '0 24px' }}>
-                  <div style={{ fontFamily: T.monoFont, fontSize: 10.5, color: T.textMute, letterSpacing: '.08em' }}>
-                    INSTAPAY QR
-                  </div>
-                  <div style={{ fontSize: 10.5, color: T.textMute, marginTop: 4, lineHeight: 1.5 }}>
-                    Coming soon
-                  </div>
-                </div>
+                <div style={{ fontFamily: T.monoFont, fontSize: 10.5, color: T.textMute }}>INSTAPAY QR — coming soon</div>
               </div>
             )}
           </div>
@@ -889,7 +1036,6 @@ function ContactTab({ isDesktop, lastUpdated }) {
           </div>
         </div>
 
-        {/* Contact */}
         <div style={{ padding: '22px 18px', borderTop: '1px solid ' + T.border }}>
           <SectionLabel>Get in touch</SectionLabel>
           <div style={{ fontFamily: T.headingFont, fontSize: 19, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 10 }}>
@@ -903,7 +1049,6 @@ function ContactTab({ isDesktop, lastUpdated }) {
           <ContactRow icon={<Icon.send s={16}/>}  label="Submit a class" />
         </div>
 
-        {/* Behind */}
         <div style={{ padding: '22px 18px 110px', borderTop: '1px solid ' + T.border }}>
           <SectionLabel>Behind the project</SectionLabel>
           <div style={{ fontSize: 13.5, color: T.textDim, lineHeight: 1.65 }}>
@@ -956,7 +1101,7 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
   const info = instrInfo || {};
   const [y, mo, da] = c.date.split('-').map(Number);
   const d = new Date(y, mo-1, da);
-  const isToday  = sameDay(d, TODAY);
+  const isToday   = sameDay(d, TODAY);
   const dateLabel = (isToday ? 'Today · ' : DOWFULL[d.getDay()] + ', ') + MONTHS[d.getMonth()] + ' ' + d.getDate();
   const sHue = studioColor(c.studioId);
   const sNm  = studio ? studioName(studio) : c.studioId;
@@ -1168,9 +1313,10 @@ function LinkRow({ icon, label, value, href }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// BOTTOM NAV — floating island (mobile only)
+// BOTTOM NAV — floats above the keyboard on mobile
 // ─────────────────────────────────────────────────────────────
-function BottomNav({ tab, setTab }) {
+function BottomNav({ tab, changeTab }) {
+  const keyboardOffset = useKeyboardOffset();
   const items = [
     { id: 'calendar', label: 'Calendar', I: Icon.cal },
     { id: 'search',   label: 'Search',   I: Icon.search },
@@ -1178,8 +1324,11 @@ function BottomNav({ tab, setTab }) {
   ];
   return (
     <div style={{
-      position: 'absolute', bottom: 18, left: '50%',
-      transform: 'translateX(-50%)', zIndex: 30,
+      position: 'absolute',
+      bottom: 18 + keyboardOffset,
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 30,
       display: 'flex', alignItems: 'center', gap: 4, padding: 6,
       background: hexA(T.bgSoft, 0.78),
       border: '1px solid ' + T.borderStrong,
@@ -1187,11 +1336,12 @@ function BottomNav({ tab, setTab }) {
       backdropFilter: 'blur(14px) saturate(140%)',
       WebkitBackdropFilter: 'blur(14px) saturate(140%)',
       boxShadow: `0 1px 0 ${hexA(T.accent,0.12)} inset, 0 16px 40px rgba(0,0,0,0.55), 0 4px 12px rgba(0,0,0,0.35)`,
+      transition: 'bottom .15s ease',
     }}>
       {items.map(it => {
         const active = tab === it.id;
         return (
-          <button key={it.id} onClick={() => setTab(it.id)} style={{
+          <button key={it.id} onClick={() => changeTab(it.id)} style={{
             background: active ? T.accent : 'transparent',
             color: active ? T.accentOn : T.textDim,
             border: 0, cursor: 'pointer',
