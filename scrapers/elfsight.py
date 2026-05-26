@@ -1,5 +1,51 @@
 import re
-from datetime import datetime
+from datetime import datetime, timezone as _tz
+
+# ── Timezone correction ───────────────────────────────────────────────────────
+# Elfsight uses IP-geolocation for timezone detection, not the browser JS clock.
+# GitHub Actions IPs resolve to UTC, so scraped times are always UTC regardless
+# of browser flags. We correct by adding (PHT_OFFSET − system_utc_offset) hours:
+#   • On GitHub Actions (UTC+0): correction = +8  → times become PHT ✓
+#   • On a Philippine dev machine (UTC+8): correction = 0  → unchanged ✓
+#
+# Proof: run #4 (scraped with the original bare Playwright setup, no special
+# flags) shows "05:00 AM – 06:30 AM" for classes that dance studios schedule
+# in the afternoon/evening — consistently 8 hours behind PHT.
+
+_PHT_OFFSET_H = 8
+
+
+def _pht_correction():
+    sys_offset = datetime.now(_tz.utc).astimezone().utcoffset().total_seconds() / 3600
+    return round(_PHT_OFFSET_H - sys_offset)
+
+
+def _shift_time_range(time_str, hours):
+    """
+    Shift every clock component in a range string by `hours`.
+    '11:00 AM – 12:30 PM' + 8 → '7:00 PM – 8:30 PM'
+    Returns the string unchanged when hours == 0.
+    """
+    if not time_str or hours == 0:
+        return time_str
+
+    def _shift_one(t, h):
+        m = re.match(r'(\d{1,2}):(\d{2})\s*(AM|PM)', t.strip(), re.IGNORECASE)
+        if not m:
+            return t
+        hr, mn = int(m.group(1)), int(m.group(2))
+        ap = m.group(3).upper()
+        if ap == 'PM' and hr != 12:
+            hr += 12
+        if ap == 'AM' and hr == 12:
+            hr = 0
+        hr = (hr + h) % 24
+        new_ap = 'PM' if hr >= 12 else 'AM'
+        new_hr = hr % 12 or 12
+        return f"{new_hr}:{mn:02d} {new_ap}"
+
+    parts = re.split(r'\s*[–\-]\s*', time_str, maxsplit=1)
+    return ' – '.join(_shift_one(p, hours) for p in parts)
 
 
 MONTHS = {
@@ -58,7 +104,7 @@ def _split_instructor(title):
     return None, title
 
 
-def parse_text(raw_text):
+def parse_text(raw_text, tz_correction=None):
     """
     Parse Elfsight Events Calendar rendered text into a list of class dicts.
 
@@ -71,6 +117,8 @@ def parse_text(raw_text):
         [VENUE]           ← optional
         REGISTER ...      ← button text, marks end of block
     """
+    if tz_correction is None:
+        tz_correction = _pht_correction()
     lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
     classes = []
     today = datetime.now()
@@ -150,7 +198,7 @@ def parse_text(raw_text):
             "instructor": instructor,
             "class_name": class_name,
             "genre": genre,
-            "time": time_str,
+            "time": _shift_time_range(time_str, tz_correction),
             "venue": venue,
         })
 

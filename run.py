@@ -98,7 +98,10 @@ async def main():
 
     insert_classes(all_rows)
 
-    status = "partial" if errors else "success"
+    # 808 Studio is a best-effort source; failures there don't degrade the run.
+    # Only mark partial if a core scraper (elfsight / nudefloor) errored.
+    core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc"))]
+    status = "partial" if core_errors else "success"
     finish_scrape_run(run_id, status)
 
     print(f"\n{'─'*50}")
