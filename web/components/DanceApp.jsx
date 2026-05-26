@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 
 // ── InstaPay QR — set to image URL (hosted or base64 data URI) when ready
 // e.g. const INSTAPAY_QR_URL = "https://sansayaw.ph/qr.png";
-const INSTAPAY_QR_URL = null;
+const INSTAPAY_QR_URL = '/instapay-qr.jpg';
 
 // ── THEME (Neon City) ────────────────────────────────────────
 const T = {
