@@ -149,41 +149,41 @@ function BgBlobs() {
       position: 'fixed', inset: 0, zIndex: 0,
       overflow: 'hidden', pointerEvents: 'none',
     }}>
-      {/* Accent cyan — top right, slow drift */}
+      {/* Accent cyan — top right */}
       <div style={{
         position: 'absolute', borderRadius: '50%',
         width: 600, height: 600,
         top: '-15%', right: '-10%',
-        background: hexA(T.accent, 0.09),
-        filter: 'blur(90px)',
-        animation: 'blobDrift1 22s ease-in-out infinite',
+        background: hexA(T.accent, 0.15),
+        filter: 'blur(80px)',
+        animation: 'blobDrift1 13s ease-in-out infinite',
       }}/>
       {/* Pink — bottom left */}
       <div style={{
         position: 'absolute', borderRadius: '50%',
         width: 500, height: 500,
         bottom: '-10%', left: '-12%',
-        background: hexA(T.secondary, 0.08),
-        filter: 'blur(80px)',
-        animation: 'blobDrift2 28s ease-in-out infinite',
+        background: hexA(T.secondary, 0.13),
+        filter: 'blur(70px)',
+        animation: 'blobDrift2 17s ease-in-out infinite',
       }}/>
-      {/* Amber — center, smaller */}
+      {/* Amber — center */}
       <div style={{
         position: 'absolute', borderRadius: '50%',
         width: 320, height: 320,
         top: '40%', left: '35%',
-        background: hexA(T.tertiary, 0.055),
-        filter: 'blur(70px)',
-        animation: 'blobDrift3 19s ease-in-out infinite',
+        background: hexA(T.tertiary, 0.10),
+        filter: 'blur(60px)',
+        animation: 'blobDrift3 11s ease-in-out infinite',
       }}/>
       {/* Second accent — bottom right */}
       <div style={{
         position: 'absolute', borderRadius: '50%',
         width: 400, height: 400,
         bottom: '5%', right: '5%',
-        background: hexA(T.accent, 0.06),
-        filter: 'blur(75px)',
-        animation: 'blobDrift4 25s ease-in-out infinite',
+        background: hexA(T.accent, 0.11),
+        filter: 'blur(65px)',
+        animation: 'blobDrift4 15s ease-in-out infinite',
       }}/>
     </div>
   );
@@ -342,25 +342,25 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
           to   { transform: translateY(0);    opacity: 1; }
         }
         @keyframes blobDrift1 {
-          0%,100% { transform: translate(0%,   0%)   scale(1);    }
-          25%     { transform: translate(6%,   10%)  scale(1.08); }
-          50%     { transform: translate(-4%,  6%)   scale(0.95); }
-          75%     { transform: translate(10%,  -4%)  scale(1.04); }
+          0%,100% { transform: translate(0%,    0%)   scale(1);    }
+          25%     { transform: translate(14%,   20%)  scale(1.14); }
+          50%     { transform: translate(-10%,  12%)  scale(0.92); }
+          75%     { transform: translate(20%,   -10%) scale(1.08); }
         }
         @keyframes blobDrift2 {
-          0%,100% { transform: translate(0%,   0%)   scale(1);    }
-          33%     { transform: translate(-8%,  -6%)  scale(1.1);  }
-          66%     { transform: translate(4%,   12%)  scale(0.93); }
+          0%,100% { transform: translate(0%,    0%)   scale(1);    }
+          33%     { transform: translate(-16%,  -12%) scale(1.14); }
+          66%     { transform: translate(10%,   22%)  scale(0.90); }
         }
         @keyframes blobDrift3 {
-          0%,100% { transform: translate(0%,   0%)   scale(1);    }
-          40%     { transform: translate(-10%, 8%)   scale(1.12); }
-          70%     { transform: translate(8%,  -10%)  scale(0.9);  }
+          0%,100% { transform: translate(0%,    0%)   scale(1);    }
+          40%     { transform: translate(-20%,  16%)  scale(1.18); }
+          70%     { transform: translate(18%,   -18%) scale(0.88); }
         }
         @keyframes blobDrift4 {
-          0%,100% { transform: translate(0%,   0%)   scale(1);    }
-          30%     { transform: translate(-6%,  -8%)  scale(1.06); }
-          60%     { transform: translate(7%,   5%)   scale(0.96); }
+          0%,100% { transform: translate(0%,    0%)   scale(1);    }
+          30%     { transform: translate(-14%,  -16%) scale(1.10); }
+          60%     { transform: translate(16%,   12%)  scale(0.93); }
         }
       `}</style>
     </div>
@@ -1048,6 +1048,9 @@ function ContactTab({ isDesktop, lastUpdated }) {
             We pull schedules from Zero Studio, The Playground Studios, and Nude Floor so
             you stop juggling six Instagram tabs at 11pm trying to find a 7am class.
           </div>
+          <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6, color: T.textMute }}>
+            This is a volunteer, community-driven project. All information is sourced from publicly available studio pages.
+          </div>
         </div>
 
         <div style={{ padding: '22px 18px', borderTop: '1px solid ' + T.border }}>
@@ -1085,14 +1088,12 @@ function ContactTab({ isDesktop, lastUpdated }) {
         <div style={{ padding: '22px 18px', borderTop: '1px solid ' + T.border }}>
           <SectionLabel>Get in touch</SectionLabel>
           <div style={{ fontFamily: T.headingFont, fontSize: 19, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 10 }}>
-            Tip us a class or say hi
+            Say hi
           </div>
           <div style={{ fontSize: 13.5, color: T.textDim, lineHeight: 1.55, marginBottom: 14 }}>
-            Got a class we&apos;re missing? Studio reached out? Bug to report? Let us know.
+            Got a class we&apos;re missing? Bug to report? Find us on Instagram.
           </div>
-          <ContactRow icon={<Icon.mail s={16}/>}  label="hello@sansayaw.ph" />
           <ContactRow icon={<span style={{ fontFamily: T.headingFont, fontSize: 14 }}>@</span>} label="instagram · @sansayaw.mnl" />
-          <ContactRow icon={<Icon.send s={16}/>}  label="Submit a class" />
         </div>
 
         <div style={{ padding: '22px 18px 110px', borderTop: '1px solid ' + T.border }}>
@@ -1191,7 +1192,7 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
         position: 'relative', background: T.bgSoft,
         borderTop: '1px solid ' + T.borderStrong,
         borderTopLeftRadius: 22, borderTopRightRadius: 22,
-        maxHeight: '94%', display: 'flex', flexDirection: 'column',
+        maxHeight: '94vh', display: 'flex', flexDirection: 'column',
         boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
         animation: 'snsIn .26s cubic-bezier(.2,.7,.3,1)',
       }}>
