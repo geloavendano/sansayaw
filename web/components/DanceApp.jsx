@@ -1019,7 +1019,7 @@ function ContactTab({ isDesktop, lastUpdated }) {
               <img
                 src={INSTAPAY_QR_URL}
                 alt="InstaPay QR Code"
-                style={{ width: 200, height: 200, borderRadius: T.radius, border: '1px solid ' + T.border, display: 'block' }}
+                style={{ width: 200, height: 'auto', borderRadius: T.radius, border: '1px solid ' + T.border, display: 'block' }}
               />
             ) : (
               <div style={{
