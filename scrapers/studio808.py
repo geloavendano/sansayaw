@@ -120,16 +120,21 @@ def parse_text(raw_text):
 
 async def scrape(page, site):
     print(f"  Fetching {site['name']} ({site['branch']})...")
-    await page.goto(site["url"], wait_until="domcontentloaded")
+    await page.goto(site["url"], wait_until="load", timeout=40000)
 
-    # Wait for the Mindbody 7-day widget to populate
+    # Wait for the Mindbody widget container to appear in the DOM
     try:
-        await page.wait_for_selector(".bw-widget--7-day", timeout=20000)
+        await page.wait_for_selector(".bw-widget", timeout=30000)
     except Exception:
         pass
-    await page.wait_for_timeout(3000)
+
+    # Extra buffer for the widget JS to populate class rows
+    await page.wait_for_timeout(5000)
 
     widget = page.locator(".bw-widget")
+    if await widget.count() == 0:
+        raise Exception("Mindbody widget (.bw-widget) not found — page may have blocked the scraper")
+
     raw_text = await widget.inner_text()
 
     classes = parse_text(raw_text)
