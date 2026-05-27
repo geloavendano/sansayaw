@@ -19,7 +19,7 @@ ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES
 
 def _revalidate_frontend():
     """POST to the Next.js revalidation webhook to bust the ISR cache."""
-    url = os.getenv("NEXT_PUBLIC_SITE_URL", "https://sansayaw.org")
+    url = os.getenv("NEXT_PUBLIC_SITE_URL", "https://www.sansayaw.org")
     secret = os.getenv("REVALIDATE_SECRET", "")
     if not secret:
         print("  [revalidate] Skipping — REVALIDATE_SECRET not set")
