@@ -18,8 +18,8 @@ function timeRangeTo24h(timeRange) {
 }
 
 function buildJsonLd(classes, studios) {
-  const now      = new Date();
-  const cutoff   = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // next 14 days
+  const now    = new Date();
+  const cutoff = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // next 14 days
 
   const events = classes
     .filter(c => {
@@ -27,11 +27,14 @@ function buildJsonLd(classes, studios) {
       const classDate  = new Date(y, mo - 1, d);
       return classDate >= now && classDate <= cutoff;
     })
-    .slice(0, 60)
+    .slice(0, 200)
     .map(c => {
-      const studio     = studios.find(s => s.id === c.studioId);
-      const time24     = c.time_range ? timeRangeTo24h(c.time_range) : null;
-      const startDate  = c.date + (time24 ? `T${time24}+08:00` : '');
+      const studio    = studios.find(s => s.id === c.studioId);
+      const time24    = c.time_range ? timeRangeTo24h(c.time_range) : null;
+      const startDate = c.date + (time24 ? `T${time24}+08:00` : '');
+      const studioLabel = studio?.branch
+        ? `${studio.name} ${studio.branch}`
+        : studio?.name || c.studioId;
 
       return {
         '@type':               'Event',
@@ -39,17 +42,18 @@ function buildJsonLd(classes, studios) {
         startDate,
         location: {
           '@type':   'Place',
-          name:      studio?.name || c.studioId,
+          name:      studioLabel,
           address: {
             '@type':           'PostalAddress',
             addressLocality:   'Metro Manila',
+            addressRegion:     'NCR',
             addressCountry:    'PH',
             streetAddress:     studio?.address || undefined,
           },
         },
         organizer: {
           '@type': 'Organization',
-          name:    studio?.name || c.studioId,
+          name:    studioLabel,
           url:     studio?.website || undefined,
         },
         ...(c.instructor ? {
@@ -58,14 +62,66 @@ function buildJsonLd(classes, studios) {
         description: [
           `${c.name} dance class`,
           c.instructor ? `with ${c.instructor}` : null,
-          `at ${studio?.name || c.studioId} in Metro Manila.`,
-          c.time_range ? `Time: ${c.time_range}.` : null,
-          c.genre ? `Genre: ${c.genre}.` : null,
+          `at ${studioLabel} in Metro Manila, Philippines.`,
+          c.time_range ? `Time: ${c.time_range} PHT.` : null,
+          c.genre ? `Style: ${c.genre}.` : null,
         ].filter(Boolean).join(' '),
         eventStatus:         'https://schema.org/EventScheduled',
         eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
       };
     });
+
+  const studioOrgs = studios.map(s => ({
+    '@type':       'DanceGroup',
+    name:          s.branch ? `${s.name} ${s.branch}` : s.name,
+    url:           s.website || undefined,
+    address: {
+      '@type':         'PostalAddress',
+      streetAddress:   s.address || undefined,
+      addressLocality: 'Metro Manila',
+      addressRegion:   'NCR',
+      addressCountry:  'PH',
+    },
+    ...(s.instagram ? { sameAs: [s.instagram] } : {}),
+  }));
+
+  const faq = {
+    '@type': 'FAQPage',
+    mainEntity: [
+      {
+        '@type': 'Question',
+        name:    'What dance classes are available in Metro Manila?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text:    "sa'nsayaw lists open dance classes from Zero Studio (QC and Mandaluyong), The Playground Studios (San Juan), Nude Floor, and 808 Studio (BGC and Podium). Styles include hip hop, K-pop cover, heels, femme, open choreography, dancehall, breaking, jazz funk, and more.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name:    'Which dance studios in Manila have open classes?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text:    'Studios with open drop-in dance classes in Metro Manila include Zero Studio in Quezon City and Mandaluyong, The Playground Studios in San Juan, Nude Floor, and 808 Studio in BGC (Bonifacio Global City) and The Podium in Ortigas.',
+        },
+      },
+      {
+        '@type': 'Question',
+        name:    'How often is the dance class schedule updated?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text:    "The schedule is scraped and updated every morning automatically. You can always see the freshest available schedules from all participating studios.",
+        },
+      },
+      {
+        '@type': 'Question',
+        name:    'Are there beginner dance classes in Manila?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text:    'Yes. Zero Studio, The Playground Studios, and 808 Studio all regularly offer beginner and beginner-intermediate level classes in styles like hip hop, K-pop, heels, and femme.',
+        },
+      },
+    ],
+  };
 
   return {
     '@context': 'https://schema.org',
@@ -73,9 +129,16 @@ function buildJsonLd(classes, studios) {
       {
         '@type':       'WebSite',
         name:          "sa'nsayaw",
-        url:           'https://sansayaw.ph',
-        description:   'Metro Manila dance class schedule aggregator. Find open classes at Zero Studio, The Playground Studios, and Nude Floor.',
+        url:           'https://sansayaw.org',
+        description:   'Metro Manila dance class schedule aggregator. Find open classes at Zero Studio, The Playground Studios, Nude Floor, and 808 Studio. Updated daily.',
+        potentialAction: {
+          '@type':       'SearchAction',
+          target:        'https://www.sansayaw.org/?q={search_term_string}',
+          'query-input': 'required name=search_term_string',
+        },
       },
+      faq,
+      ...studioOrgs,
       ...events,
     ],
   };
