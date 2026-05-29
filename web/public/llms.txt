@@ -1,0 +1,22 @@
+# sa'nsayaw
+
+> Metro Manila dance class schedule aggregator. Updated daily.
+
+sa'nsayaw (sansayaw.org) lists open drop-in dance classes from studios across Metro Manila, Philippines. The schedule is scraped automatically every morning and covers the next 7–14 days.
+
+## Studios covered
+
+- **ZERØ Studio** (Quezon City & Mandaluyong) — hip hop, K-pop cover, heels, femme, breaking, open choreography
+- **The Playground Studios** (San Juan, Metro Manila) — open choreography, K-pop cover, femme, collab classes
+- **Nude Floor** (Manila) — dancehall, femme, fitness
+- **808 Studio** (BGC/Taguig & The Podium, Ortigas) — 808 Signature, 808 Step, 808 Originals, 808 Cover
+
+## Data
+
+- Schedule data is scraped daily from each studio's public booking/calendar page
+- Each class entry includes: date, time (PHT), instructor, class name, genre/style, venue
+- No user data is collected beyond standard web analytics
+
+## Contact
+
+For questions or to add a studio: see the About page at https://www.sansayaw.org

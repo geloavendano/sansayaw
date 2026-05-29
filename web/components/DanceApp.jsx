@@ -388,21 +388,22 @@ function DesktopSidebar({ tab, changeTab, lastUpdated }) {
     }}>
       {/* Wordmark */}
       <div>
-        <div style={{
+        <h1 style={{
+          margin: 0,
           fontFamily: T.headingFont, fontSize: 38, fontWeight: 700,
           letterSpacing: '-0.03em', lineHeight: 1, color: T.text,
         }}>
           sa<span style={{
             color: T.accent, textShadow: '0 0 20px ' + T.accent,
           }}>'</span>nsayaw
-        </div>
-        <div style={{
-          marginTop: 8,
+        </h1>
+        <p style={{
+          margin: '8px 0 0',
           fontFamily: T.monoFont, fontSize: 11, fontWeight: 500,
           color: T.textMute, letterSpacing: '.12em', textTransform: 'uppercase',
         }}>
           MNL Dance Classes
-        </div>
+        </p>
         {/* Accent rule */}
         <div style={{
           marginTop: 20,
@@ -508,6 +509,9 @@ function CalendarTab({ isDesktop, date, setDate, TODAY, filtered, totalToday, st
       <DayStrip date={date} setDate={setDate} TODAY={TODAY} dateCount={dateCount} />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px 110px' }}>
+        <h2 style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: 0 }}>
+          {dayLabel} dance classes in Metro Manila
+        </h2>
         {filtered.length === 0 ? <EmptyState /> : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {filtered.map(c => (
