@@ -123,7 +123,8 @@ function useKeyboardOffset() {
 
 // ── ICONS ────────────────────────────────────────────────────
 const Icon = {
-  cal:    p => <svg viewBox="0 0 24 24" width={p.s||20} height={p.s||20} fill="none" stroke="currentColor" strokeWidth={p.w||1.6} strokeLinecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3.5v3.5M16 3.5v3.5"/></svg>,
+  cal:      p => <svg viewBox="0 0 24 24" width={p.s||20} height={p.s||20} fill="none" stroke="currentColor" strokeWidth={p.w||1.6} strokeLinecap="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 9.5h17M8 3.5v3.5M16 3.5v3.5"/></svg>,
+  download: p => <svg viewBox="0 0 24 24" width={p.s||16} height={p.s||16} fill="none" stroke="currentColor" strokeWidth={p.w||1.6} strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v13M7 12l5 5 5-5M4 19h16"/></svg>,
   search: p => <svg viewBox="0 0 24 24" width={p.s||20} height={p.s||20} fill="none" stroke="currentColor" strokeWidth={p.w||1.6} strokeLinecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m19.5 19.5-3.8-3.8"/></svg>,
   info:   p => <svg viewBox="0 0 24 24" width={p.s||20} height={p.s||20} fill="none" stroke="currentColor" strokeWidth={p.w||1.6} strokeLinecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg>,
   filter: p => <svg viewBox="0 0 24 24" width={p.s||18} height={p.s||18} fill="none" stroke="currentColor" strokeWidth={p.w||1.6} strokeLinecap="round"><path d="M5 7h14M8 12h8M11 17h2"/></svg>,
@@ -1149,6 +1150,84 @@ function ContactRow({ icon, label }) {
 // ─────────────────────────────────────────────────────────────
 // CLASS DETAIL SHEET
 // ─────────────────────────────────────────────────────────────
+// ── Calendar helpers ──────────────────────────────────────────
+function parseTimeRange(timeRange) {
+  if (!timeRange) return null;
+  const parts = timeRange.split(/\s*[–\-]\s*/);
+  if (parts.length < 2) return null;
+  function parse12h(t) {
+    const m = t.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!m) return null;
+    let h = parseInt(m[1]), min = parseInt(m[2]);
+    const ap = m[3].toUpperCase();
+    if (ap === 'PM' && h !== 12) h += 12;
+    if (ap === 'AM' && h === 12) h = 0;
+    return { h, min };
+  }
+  const start = parse12h(parts[0]);
+  const end   = parse12h(parts[1]);
+  return (start && end) ? { start, end } : null;
+}
+
+function buildCalendarData(c, studio) {
+  const times = parseTimeRange(c.time_range);
+  const [y, mo, d] = c.date.split('-').map(Number);
+  const sNm    = studio?.branch ? `${studio.name} ${studio.branch}` : (studio?.name || '');
+  const title  = c.instructor ? `${c.name} w/ ${c.instructor}` : c.name;
+  const loc    = [sNm, studio?.address].filter(Boolean).join(', ');
+  const desc   = [
+    c.instructor ? `Instructor: ${c.instructor}` : null,
+    c.genre      ? `Style: ${c.genre}`            : null,
+    c.venue      ? `Venue: ${c.venue}`             : null,
+    studio?.website ? `More info: ${studio.website}` : null,
+  ].filter(Boolean).join('\n');
+
+  // PHT → UTC (Manila is UTC+8)
+  function toUTC(y, mo, d, h, min) {
+    return new Date(Date.UTC(y, mo - 1, d, h - 8, min))
+      .toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  }
+  function toICSLocal(y, mo, d, h, min) {
+    return `${y}${String(mo).padStart(2,'0')}${String(d).padStart(2,'0')}T${String(h).padStart(2,'0')}${String(min).padStart(2,'0')}00`;
+  }
+
+  const dtFmt = times ? 'TZID=Asia/Manila:' : 'VALUE=DATE:';
+  const dtS   = times ? toICSLocal(y, mo, d, times.start.h, times.start.min) : c.date.replace(/-/g, '');
+  const dtE   = times ? toICSLocal(y, mo, d, times.end.h,   times.end.min)   : c.date.replace(/-/g, '');
+  const ics   = [
+    'BEGIN:VCALENDAR', 'VERSION:2.0',
+    'PRODID:-//sansayaw//sansayaw.org//EN',
+    'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `DTSTART;${dtFmt}${dtS}`,
+    `DTEND;${dtFmt}${dtE}`,
+    `SUMMARY:${title}`,
+    `DESCRIPTION:${desc.replace(/\n/g, '\\n')}`,
+    `LOCATION:${loc}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT', 'END:VCALENDAR',
+  ].join('\r\n');
+
+  const gcalStart = times ? toUTC(y, mo, d, times.start.h, times.start.min) : c.date.replace(/-/g, '');
+  const gcalEnd   = times ? toUTC(y, mo, d, times.end.h,   times.end.min)   : c.date.replace(/-/g, '');
+  const gcalUrl   = `https://calendar.google.com/calendar/render?action=TEMPLATE` +
+    `&text=${encodeURIComponent(title)}` +
+    `&dates=${gcalStart}/${gcalEnd}` +
+    `&details=${encodeURIComponent(desc)}` +
+    `&location=${encodeURIComponent(loc)}`;
+
+  const filename = title.replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.ics';
+  return { gcalUrl, ics, filename };
+}
+
+function downloadICS(ics, filename) {
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
   const info = instrInfo || {};
   const [dragY, setDragY] = useState(0);
@@ -1285,6 +1364,44 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
                 href={studio.instagram} />
             )}
           </div>
+
+          {(() => {
+            const cal = buildCalendarData(c, studio);
+            const rowStyle = {
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '13px 14px',
+              background: T.panel, border: '1px solid ' + T.border, borderRadius: T.radius, color: T.text,
+            };
+            const iconBox = {
+              width: 32, height: 32, borderRadius: 8,
+              background: T.accentSoft, color: T.accent,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto',
+            };
+            const label1 = { fontSize: 13, fontWeight: 500 };
+            const label2 = { fontSize: 11.5, color: T.textDim, marginTop: 1, fontFamily: T.monoFont };
+            return (
+              <>
+                <SectionDivider label="Add to calendar" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <a href={cal.gcalUrl} target="_blank" rel="noopener noreferrer" style={{ ...rowStyle, textDecoration: 'none' }}>
+                    <span style={iconBox}><Icon.cal s={16}/></span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={label1}>Google Calendar</div>
+                      <div style={label2}>Opens in browser</div>
+                    </div>
+                    <span style={{ color: T.textMute, flex: '0 0 auto' }}><Icon.ext s={14}/></span>
+                  </a>
+                  <button onClick={() => downloadICS(cal.ics, cal.filename)} style={{ ...rowStyle, cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+                    <span style={iconBox}><Icon.download s={16}/></span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={label1}>Download .ics</div>
+                      <div style={label2}>Apple Calendar · Outlook · more</div>
+                    </div>
+                  </button>
+                </div>
+              </>
+            );
+          })()}
         </div>
       </div>
       </div>{/* end drag wrapper */}
