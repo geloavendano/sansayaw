@@ -1340,11 +1340,16 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
             }}>{initials(sNm)}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: T.headingFont, fontSize: 16, fontWeight: 600 }}>{sNm}</div>
-              {sLc && (
-                <div style={{ fontSize: 12.5, color: T.textDim, marginTop: 2, display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <Icon.pin s={12}/><span>{sLc}</span>
-                </div>
-              )}
+              {sLc && (() => {
+                const mapsQ = encodeURIComponent(studio?.address ? `${sNm} ${studio.address}` : `${sNm} ${sLc}`);
+                const mapsHref = `https://maps.google.com/?q=${mapsQ}`;
+                return (
+                  <a href={mapsHref} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: 12.5, color: T.textDim, marginTop: 2, display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>
+                    <Icon.pin s={12}/><span style={{ textDecoration: 'underline', textUnderlineOffset: 2 }}>{sLc}</span>
+                  </a>
+                );
+              })()}
               {studio?.address && (
                 <div style={{ fontSize: 11.5, color: T.textMute, marginTop: 2, lineHeight: 1.5 }}>{studio.address}</div>
               )}
