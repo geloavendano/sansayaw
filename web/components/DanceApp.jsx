@@ -211,7 +211,22 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
   };
 
   const [date, setDate]                       = useState(TODAY);
+  const allStudioIds = useMemo(() => new Set(studios.map(s => s.id)), [studios]);
   const [enabledStudios, setEnabledStudios]   = useState(() => new Set(studios.map(s => s.id)));
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('sansayaw-filter') || 'null');
+      if (Array.isArray(saved) && saved.length > 0) {
+        setEnabledStudios(new Set(saved.filter(id => allStudioIds.has(id))));
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('sansayaw-filter', JSON.stringify([...enabledStudios])); } catch {}
+  }, [enabledStudios]);
+
   const [showFilter, setShowFilter]           = useState(false);
   const [showPicker, setShowPicker]           = useState(false);
   const [pickerMonth, setPickerMonth]         = useState(new Date(TODAY));
