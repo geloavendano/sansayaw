@@ -15,10 +15,11 @@ function parseTimeStart(tr) {
 async function fetchAppData() {
   const db = createServerClient();
 
+  const s = db.schema('sansayaw');
   const [runsRes, studiosRes, instrsRes] = await Promise.all([
-    db.from('scrape_runs').select('id, scraped_at').in('status', ['success', 'partial']).order('id', { ascending: false }).limit(1),
-    db.from('studios').select('*').order('name'),
-    db.from('instructors').select('*'),
+    s.from('scrape_runs').select('id, scraped_at').in('status', ['success', 'partial']).order('id', { ascending: false }).limit(1),
+    s.from('studios').select('*').order('name'),
+    s.from('instructors').select('*'),
   ]);
 
   if (runsRes.error) throw new Error(runsRes.error.message);
@@ -32,7 +33,7 @@ async function fetchAppData() {
 
   if (!runId) return { studios, instrs, classes: [], lastUpdated };
 
-  const clsRes = await db.from('classes').select('*').eq('scrape_run_id', runId);
+  const clsRes = await s.from('classes').select('*').eq('scrape_run_id', runId);
   if (clsRes.error) throw new Error(clsRes.error.message);
 
   const classes = (clsRes.data || []).map(c => ({

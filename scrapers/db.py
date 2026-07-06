@@ -34,7 +34,7 @@ def seed_studios(studios):
         }
         for s in studios
     ]
-    client.table("studios").upsert(rows).execute()
+    client.schema("sansayaw").table("studios").upsert(rows).execute()
 
 
 def upsert_instructors(names):
@@ -59,13 +59,13 @@ def upsert_instructors(names):
     if not unique_bases:
         return {}
 
-    client.table("instructors").upsert(
+    client.schema("sansayaw").table("instructors").upsert(
         [{"name": n} for n in unique_bases],
         on_conflict="name",
         ignore_duplicates=True,
     ).execute()
 
-    result = client.table("instructors").select("id, name").in_("name", unique_bases).execute()
+    result = client.schema("sansayaw").table("instructors").select("id, name").in_("name", unique_bases).execute()
     base_to_id = {row["name"]: row["id"] for row in result.data}
 
     # Return mapping from original display name → id
@@ -74,13 +74,13 @@ def upsert_instructors(names):
 
 def create_scrape_run():
     client = get_client()
-    result = client.table("scrape_runs").insert({"status": "running"}).execute()
+    result = client.schema("sansayaw").table("scrape_runs").insert({"status": "running"}).execute()
     return result.data[0]["id"]
 
 
 def finish_scrape_run(run_id, status="success"):
     client = get_client()
-    client.table("scrape_runs").update({"status": status}).eq("id", run_id).execute()
+    client.schema("sansayaw").table("scrape_runs").update({"status": status}).eq("id", run_id).execute()
 
 
 def insert_classes(rows):
@@ -91,4 +91,4 @@ def insert_classes(rows):
     # Insert in chunks to stay safely under API limits
     chunk = 500
     for i in range(0, len(rows), chunk):
-        client.table("classes").insert(rows[i : i + chunk]).execute()
+        client.schema("sansayaw").table("classes").insert(rows[i : i + chunk]).execute()
