@@ -4,7 +4,7 @@ import urllib.request
 
 from playwright.async_api import async_playwright
 
-from scrapers import elfsight, nudefloor, studio808
+from scrapers import elfsight, nudefloor, studio808, tads
 from scrapers import normalize
 from scrapers.db import (
     seed_studios,
@@ -14,7 +14,7 @@ from scrapers.db import (
     insert_classes,
 )
 
-ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES
+ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES + [tads.SITE]
 
 
 def _revalidate_frontend():
@@ -110,6 +110,15 @@ async def main():
                 errors.append(f"{studio_data['id']}: {studio_data['error']}")
             all_rows += _build_class_rows(studio_data, {}, run_id, is_caps=True)
 
+        # ── TADS — Wix Bookings (mixed-case source) ──────────────────────────
+        tads_data = None
+        try:
+            tads_data = await tads.scrape(page)
+            all_rows += _build_class_rows(tads_data, {}, run_id, is_caps=False)
+        except Exception as e:
+            errors.append(f"tads: {e}")
+            print(f"  TADS ERROR: {e}")
+
         await browser.close()
 
     # Upsert all unique instructor names in one round-trip, then patch IDs
@@ -121,9 +130,9 @@ async def main():
 
     insert_classes(all_rows)
 
-    # 808 Studio is a best-effort source; failures there don't degrade the run.
+    # 808 Studio and TADS are best-effort; failures don't degrade the run.
     # Only mark partial if a core scraper (elfsight / nudefloor) errored.
-    core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc"))]
+    core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc", "tads"))]
     status = "partial" if core_errors else "success"
     finish_scrape_run(run_id, status)
 
@@ -134,7 +143,10 @@ async def main():
     print(f"Status : {status}")
     print(f"Run ID : {run_id}")
     print(f"Classes: {len(all_rows)}")
-    for s in elfsight_results + studio808_results:
+    all_summary = elfsight_results + studio808_results
+    if tads_data:
+        all_summary.append(tads_data)
+    for s in all_summary:
         branch = f" ({s['branch']})" if s.get("branch") else ""
         flag = " ⚠" if s.get("error") else ""
         print(f"  {s['name']}{branch}: {len(s['classes'])}{flag}")
