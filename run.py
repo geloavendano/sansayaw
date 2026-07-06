@@ -4,7 +4,7 @@ import urllib.request
 
 from playwright.async_api import async_playwright
 
-from scrapers import elfsight, nudefloor, studio808, tads
+from scrapers import elfsight, nudefloor, studio808, tads, kidlat
 from scrapers import normalize
 from scrapers.db import (
     seed_studios,
@@ -14,7 +14,7 @@ from scrapers.db import (
     insert_classes,
 )
 
-ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES + [tads.SITE]
+ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES + [tads.SITE] + [kidlat.SITE]
 
 
 def _revalidate_frontend():
@@ -121,6 +121,15 @@ async def main():
 
         await browser.close()
 
+    # ── Kidlat — Rezerv API (no browser needed) ───────────────────────────
+    kidlat_data = None
+    try:
+        kidlat_data = await kidlat.scrape()
+        all_rows += _build_class_rows(kidlat_data, {}, run_id, is_caps=False)
+    except Exception as e:
+        errors.append(f"kidlat: {e}")
+        print(f"  Kidlat ERROR: {e}")
+
     # Upsert all unique instructor names in one round-trip, then patch IDs
     all_names = list({r["instructor"] for r in all_rows if r["instructor"]})
     instructor_map = upsert_instructors(all_names)
@@ -132,7 +141,7 @@ async def main():
 
     # 808 Studio and TADS are best-effort; failures don't degrade the run.
     # Only mark partial if a core scraper (elfsight / nudefloor) errored.
-    core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc", "tads"))]
+    core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc", "tads", "kidlat"))]
     status = "partial" if core_errors else "success"
     finish_scrape_run(run_id, status)
 
@@ -146,6 +155,8 @@ async def main():
     all_summary = elfsight_results + studio808_results
     if tads_data:
         all_summary.append(tads_data)
+    if kidlat_data:
+        all_summary.append(kidlat_data)
     for s in all_summary:
         branch = f" ({s['branch']})" if s.get("branch") else ""
         flag = " ⚠" if s.get("error") else ""
