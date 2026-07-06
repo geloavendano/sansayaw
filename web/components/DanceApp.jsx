@@ -924,6 +924,11 @@ function SearchTab({ isDesktop, query, setQuery, classes, studios, onOpenClass }
           || (c.instructor || '').toLowerCase().includes(q)
           || (s && s.name.toLowerCase().includes(q))
           || (c.genre || '').toLowerCase().includes(q);
+    }).sort((a, b) => {
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      const at = a.parsedTime ? a.parsedTime.hour * 60 + a.parsedTime.minute : 0;
+      const bt = b.parsedTime ? b.parsedTime.hour * 60 + b.parsedTime.minute : 0;
+      return at - bt;
     }).slice(0, 30);
   }, [q, classes, studios]);
 
@@ -1034,7 +1039,7 @@ function SearchTab({ isDesktop, query, setQuery, classes, studios, onOpenClass }
                     </div>
                     <div style={{ marginTop: 6, fontSize: 12.5, color: T.textDim, display: 'flex', alignItems: 'center', gap: 7 }}>
                       <span style={{ width: 6, height: 6, borderRadius: 999, background: sHue, flex: '0 0 auto' }}/>
-                      <span>{r.instructor} · <span style={{ color: T.text }}>{s ? s.name : r.studioId}</span></span>
+                      <span>{r.instructor} · <span style={{ color: T.text }}>{s ? studioName(s) : r.studioId}</span></span>
                     </div>
                   </button>
                 );
