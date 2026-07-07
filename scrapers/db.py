@@ -37,39 +37,66 @@ def seed_studios(studios):
     client.schema("sansayaw").table("studios").upsert(rows).execute()
 
 
-def upsert_instructors(names):
+def resolve_instructors(pairs):
     """
-    Upsert a list of normalized instructor names.
-    Returns a dict of {display_name: id}.
+    Look up (display_name, studio_id) pairs against the instructor_aliases
+    rules table (like email filters: "this name at this studio is person #N").
 
-    Sub instructors ("Abby (Sub)") are stored under their base name ("Abby")
-    so they don't create duplicate instructor records. The display name with
-    "(Sub)" is kept in the classes.instructor column for context.
+    Only pairs with a confirmed rule resolve to an id — unknown pairs are
+    left out, so their classes keep a NULL instructor_id until confirmed
+    with `python3 manage_instructors.py review`. The scraper never invents
+    identities on its own.
+
+    Sub instructors ("Abby (Sub)") resolve under their base name ("Abby")
+    at the same studio. The display name with "(Sub)" is kept in the
+    classes.instructor column for context.
+
+    Returns {(display_name, studio_id): instructor_id}.
     """
     client = get_client()
 
-    # Map display name → canonical name (strip " (Sub)" suffix for DB keying)
+    # Map display pair → canonical pair (strip " (Sub)" suffix for keying)
     canonical = {}
-    for n in names:
-        if n:
-            base = n.replace(" (Sub)", "").strip()
-            canonical[n] = base
+    for name, studio_id in pairs:
+        if name and studio_id:
+            base = name.replace(" (Sub)", "").strip()
+            canonical[(name, studio_id)] = (base, studio_id)
 
-    unique_bases = list({v for v in canonical.values()})
-    if not unique_bases:
+    if not canonical:
         return {}
 
-    client.schema("sansayaw").table("instructors").upsert(
-        [{"name": n} for n in unique_bases],
-        on_conflict="name",
-        ignore_duplicates=True,
-    ).execute()
+    base_names = list({n for n, _ in canonical.values()})
+    existing = (
+        client.schema("sansayaw").table("instructor_aliases")
+        .select("name, studio_id, instructor_id")
+        .in_("name", base_names)
+        .execute()
+    )
+    alias_map = {(r["name"], r["studio_id"]): r["instructor_id"] for r in existing.data}
 
-    result = client.schema("sansayaw").table("instructors").select("id, name").in_("name", unique_bases).execute()
-    base_to_id = {row["name"]: row["id"] for row in result.data}
+    return {display: alias_map[base] for display, base in canonical.items() if base in alias_map}
 
-    # Return mapping from original display name → id
-    return {display: base_to_id[base] for display, base in canonical.items() if base in base_to_id}
+
+def update_instructor_photos(photos_by_id):
+    """
+    Fill photo_url per instructor id from scraped Elfsight cards.
+    Manually curated photos (non-Elfsight URLs) are never overwritten.
+    """
+    if not photos_by_id:
+        return
+    client = get_client()
+    s = client.schema("sansayaw")
+    current = (
+        s.table("instructors").select("id, photo_url")
+        .in_("id", list(photos_by_id)).execute()
+    )
+    for row in current.data:
+        url = photos_by_id.get(row["id"])
+        existing = row.get("photo_url") or ""
+        # Photos on elfsight domains (files.elfsight.com / files.elfsightcdn.com)
+        # are scraper-managed and refreshable; anything else was set manually.
+        if url and url != existing and (not existing or "elfsight" in existing):
+            s.table("instructors").update({"photo_url": url}).eq("id", row["id"]).execute()
 
 
 def create_scrape_run():

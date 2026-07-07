@@ -8,7 +8,8 @@ from scrapers import elfsight, nudefloor, studio808, tads, kidlat, ember
 from scrapers import normalize
 from scrapers.db import (
     seed_studios,
-    upsert_instructors,
+    resolve_instructors,
+    update_instructor_photos,
     create_scrape_run,
     finish_scrape_run,
     insert_classes,
@@ -139,12 +140,27 @@ async def main():
         errors.append(f"kidlat: {e}")
         print(f"  Kidlat ERROR: {e}")
 
-    # Upsert all unique instructor names in one round-trip, then patch IDs
-    all_names = list({r["instructor"] for r in all_rows if r["instructor"]})
-    instructor_map = upsert_instructors(all_names)
+    # Resolve (instructor, studio) pairs to ids via confirmed alias rules
+    all_pairs = list({(r["instructor"], r["studio_id"]) for r in all_rows if r["instructor"]})
+    instructor_map = resolve_instructors(all_pairs)
+    unmatched = [p for p in all_pairs if p not in instructor_map]
+    if unmatched:
+        print(f"\n  {len(unmatched)} instructor/studio pair(s) unassigned — run: python3 manage_instructors.py review")
+
+    # Update instructor photos from Elfsight scrapers.
+    # Elfsight alt text is ALL CAPS — normalize with is_caps=True to match stored names.
+    elfsight_photos = {}
+    for data in elfsight_results:
+        for raw_name, url in data.get("instructor_photos", {}).items():
+            norm = normalize.instructor(raw_name, is_caps=True)
+            instructor_id = instructor_map.get((norm, data["id"]))
+            if instructor_id and instructor_id not in elfsight_photos:
+                elfsight_photos[instructor_id] = url
+    update_instructor_photos(elfsight_photos)
+
     for row in all_rows:
         if row["instructor"]:
-            row["instructor_id"] = instructor_map.get(row["instructor"])
+            row["instructor_id"] = instructor_map.get((row["instructor"], row["studio_id"]))
 
     insert_classes(all_rows)
 

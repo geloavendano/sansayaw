@@ -1,0 +1,29 @@
+{
+  "weekLabel": "July 7 – 13, 2025",
+  "format": "overlay",
+  "choreographers": [
+    {
+      "name": "Caila Santos",
+      "handle": "@cailasantos",
+      "bio": "Choreographer · HipHop & Jazz",
+      "photo": null,
+      "placeholderIndex": 0,
+      "classes": [
+        { "day": "Mon", "time": "7:00 PM", "name": "Hiphop (Choreo Class) 'Movin'", "location": "The Playground Studios" },
+        { "day": "Wed", "time": "8:00 PM", "name": "Open Choreo Lab", "location": "The Playground Studios" },
+        { "day": "Fri", "time": "6:30 PM", "name": "Jazz Fundamentals", "location": "808 Studio · Podium" }
+      ]
+    },
+    {
+      "name": "Rex Villanueva",
+      "handle": "@rexvillanueva",
+      "bio": "International Choreographer",
+      "photo": null,
+      "placeholderIndex": 1,
+      "classes": [
+        { "day": "Tue", "time": "7:00 PM", "name": "Beg – Int. Choreo", "location": "The Playground Studios" },
+        { "day": "Thu", "time": "9:00 PM", "name": "Advanced Hiphop", "location": "Nude Floor" }
+      ]
+    }
+  ]
+}

@@ -244,6 +244,22 @@ async def scrape(page, site):
     classes = parse_text(raw_text)
     print(f"    → {len(classes)} classes found")
 
+    # Extract instructor photos from Elfsight card images.
+    # Each card renders: <img class="eapp-events-calendar-media-image" alt="..." src="...">
+    # The alt is the card title — either "INSTRUCTOR: CLASS" or just the
+    # instructor's name — so split it the same way as class titles.
+    photo_map = {}
+    imgs = await page.locator("img.eapp-events-calendar-media-image").all()
+    for img in imgs:
+        alt = (await img.get_attribute("alt") or "").strip()
+        src = await img.get_attribute("src") or ""
+        name, _ = _split_instructor(alt)
+        name = name or alt
+        if name and src and name not in photo_map:
+            photo_map[name] = src
+    if photo_map:
+        print(f"    → {len(photo_map)} instructor photo(s) found")
+
     return {
         "id": site["id"],
         "name": site["name"],
@@ -251,6 +267,7 @@ async def scrape(page, site):
         "address": site["address"],
         "source_url": site["url"],
         "classes": classes,
+        "instructor_photos": photo_map,
     }
 
 

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: transparent; font-family: 'DM Sans', sans-serif; }
+
+  /* Card designed at 540×675 CSS px; screenshot at deviceScaleFactor 2 → 1080×1350 */
+  #card {
+    position: relative;
+    overflow: hidden;
+    width: 540px;
+    height: 675px;
+    border-radius: 0;               /* full-bleed for Instagram */
+    background: #0b0b12;
+    color: #f0eef8;
+  }
+
+  /* Overlay format: transparent, sizes to content, layers over any image */
+  #card.overlay {
+    height: auto;
+    overflow: visible;
+    background: transparent;
+    padding: 4px 8px;
+  }
+  .topbar-ov {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .glass.dark {
+    background: rgba(11,11,18,0.72);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .bg { position: absolute; inset: 0; }
+  .bg-blur {
+    position: absolute; inset: -30%;
+    width: 160%; height: 160%; object-fit: cover;
+    filter: blur(64px) saturate(1.3) brightness(0.65);
+  }
+  .bg-photo {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%; object-fit: cover;
+    transform-origin: center center;
+  }
+  .bg-scrim {
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom,
+      rgba(11,11,18,0.18) 0%, rgba(11,11,18,0.22) 35%,
+      rgba(11,11,18,0.72) 52%, rgba(11,11,18,0.97) 65%, #0b0b12 80%);
+  }
+
+  .monogram {
+    position: absolute; inset: 0;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 48px; pointer-events: none;
+    font-size: 144px; font-weight: 700;
+    color: rgba(91,212,203,0.07); letter-spacing: -8px;
+  }
+
+  .topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 24px 28px 0;
+  }
+  .brand { font-size: 22px; font-weight: 700; letter-spacing: 0.04em; }
+  .week-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 16px; border-radius: 999px;
+    background: rgba(11,11,18,0.5);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    font-size: 15px; font-weight: 500;
+  }
+  .week-pill svg { color: #5bd4cb; }
+
+  .bottom { position: absolute; bottom: 0; left: 0; right: 0; padding: 0 28px 24px; }
+
+  .instructor-name { font-size: 34px; font-weight: 700; line-height: 1.2; }
+  .instructor-bio  { font-size: 18px; color: #8888a8; margin-top: 4px; }
+
+  .glass {
+    margin-top: 16px;
+    border-radius: 24px; padding: 8px 24px 12px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.11);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+  }
+  .glass-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 0 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .glass-dot { width: 10px; height: 10px; border-radius: 50%; background: #5bd4cb; flex-shrink: 0; }
+  .glass-title {
+    font-size: 15px; font-weight: 600; color: #5bd4cb;
+    letter-spacing: 0.12em; text-transform: uppercase;
+  }
+
+  .row {
+    display: flex; align-items: center; gap: 20px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .row:last-child { border-bottom: none; }
+  .row-when { min-width: 68px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; }
+  .row-day  {
+    font-size: 16px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.1em; color: #8888a8;
+  }
+  .row-time { font-size: 20px; font-weight: 500; line-height: 1.2; }
+  .row-info { flex: 1; min-width: 0; }
+  .row-name {
+    font-size: 22px; font-weight: 600; line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .row-loc {
+    display: flex; align-items: center; gap: 6px; margin-top: 4px;
+    font-size: 18px; color: #8888a8;
+  }
+  .row-loc svg { color: #5bd4cb; flex-shrink: 0; }
+  .row-loc span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .more { font-size: 16px; color: #8888a8; text-align: center; padding: 6px 0 4px; }
+
+  .footer {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 12px;
+  }
+  .footer-handle { font-size: 16px; color: #8888a8; }
+  .footer-site   { font-size: 14px; color: #5bd4cb; font-weight: 500; }
+</style>
+</head>
+<body>
+<div id="card"></div>
+
+<script>
+const PLACEHOLDER_GRADIENTS = [
+  "linear-gradient(145deg, #1a1030 0%, #0e2030 100%)",
+  "linear-gradient(145deg, #0e2820 0%, #101028 100%)",
+  "linear-gradient(145deg, #281010 0%, #28200e 100%)",
+  "linear-gradient(145deg, #0e1828 0%, #1a0e28 100%)",
+];
+
+const CAL_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>`;
+const PIN_ICON = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`;
+
+function esc(s) {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function scheduleCard(data, maxClasses, dark) {
+  const visible = (data.classes || []).slice(0, maxClasses);
+  const extra = (data.classes || []).length - visible.length;
+
+  const rows = visible.map(c => `
+    <div class="row">
+      <div class="row-when">
+        <span class="row-day">${esc(c.day)}</span>
+        <span class="row-time">${esc(c.time)}</span>
+      </div>
+      <div class="row-info">
+        <div class="row-name">${esc(c.name)}</div>
+        <div class="row-loc">${PIN_ICON}<span>${esc(c.location)}</span></div>
+      </div>
+    </div>`).join("");
+
+  return `
+    <div class="instructor-name">${esc(data.name)}</div>
+    <div class="instructor-bio">${esc(data.bio || "Choreographer")}</div>
+    <div class="glass${dark ? " dark" : ""}">
+      <div class="glass-header">
+        <div class="glass-dot"></div>
+        <span class="glass-title">This Week's Classes</span>
+      </div>
+      ${rows || `<div class="more">No classes this week</div>`}
+      ${extra > 0 ? `<div class="more">+${extra} more</div>` : ""}
+    </div>
+    <div class="footer">
+      <span class="footer-handle">${esc(data.handle || "")}</span>
+      <span class="footer-site">sansayaw.org</span>
+    </div>`;
+}
+
+function render(data) {
+  const card = document.getElementById("card");
+
+  // ── Overlay: transparent, no photo layer, fits over any image ──
+  if (data.format === "overlay") {
+    card.className = "overlay";
+    card.innerHTML = `
+      <div class="topbar-ov">
+        <span class="brand">sa'nsayaw</span>
+        <div class="week-pill">${CAL_ICON}<span>${esc(data.weekLabel)}</span></div>
+      </div>
+      ${scheduleCard(data, 5, true)}`;
+    return;
+  }
+
+  // ── Portrait: full-bleed photo / gradient background ──
+  card.className = "";
+  const initials = (data.name || "")
+    .split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+  const off = data.photoOffset || { x: 0, y: 0 };
+  const scale = data.photoScale || 1;
+
+  const bg = data.photo
+    ? `<img class="bg-blur" src="${esc(data.photo)}">
+       <img class="bg-photo" src="${esc(data.photo)}"
+            style="transform: translate(${off.x}%, ${off.y}%) scale(${scale})">`
+    : `<div style="width:100%;height:100%;background:${PLACEHOLDER_GRADIENTS[(data.placeholderIndex || 0) % PLACEHOLDER_GRADIENTS.length]}"></div>`;
+
+  card.innerHTML = `
+    <div class="bg">
+      ${bg}
+      <div class="bg-scrim"></div>
+    </div>
+    ${data.photo ? "" : `<div class="monogram">${esc(initials)}</div>`}
+    <div class="topbar">
+      <span class="brand">sa'nsayaw</span>
+      <div class="week-pill">${CAL_ICON}<span>${esc(data.weekLabel)}</span></div>
+    </div>
+    <div class="bottom">
+      ${scheduleCard(data, 4, false)}
+    </div>`;
+}
+</script>
+</body>
+</html>
