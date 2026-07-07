@@ -123,11 +123,26 @@ def _parse_classes(lines, date_str):
     return classes
 
 
+async def _cell_dates(page):
+    """Return list of (idx, ISO-date) for all gridcells that have a data-date."""
+    grid_cells = page.locator('[role="gridcell"]')
+    n = await grid_cells.count()
+    result = []
+    for idx in range(n):
+        cell = grid_cells.nth(idx)
+        data_date = await cell.get_attribute("data-date")
+        if not data_date:
+            continue
+        parts = data_date.split("-")
+        if len(parts) == 3:
+            result.append((idx, f"{parts[0]}-{int(parts[1]):02d}-{int(parts[2]):02d}"))
+    return result
+
+
 async def scrape(page):
     print("  Fetching TADS...")
     await page.goto(SITE["source_url"], wait_until="domcontentloaded", timeout=60000)
 
-    # Wait for the Wix Bookings calendar grid to render
     try:
         await page.wait_for_selector('[role="grid"]', timeout=30000)
     except Exception:
@@ -135,67 +150,41 @@ async def scrape(page):
 
     await page.wait_for_timeout(2000)
 
+    today = _date.today()
+    today_str = today.strftime("%Y-%m-%d")
+
+    # Wix headless often loads on a past week. Read the first displayed date,
+    # calculate how many weeks behind today it is, and advance exactly that many
+    # times so we land on today's week before scraping.
+    initial_dates = await _cell_dates(page)
+    if initial_dates:
+        first_str = min(d for _, d in initial_dates)
+        first_date = _date.fromisoformat(first_str)
+        weeks_behind = max(0, (today - first_date).days // 7)
+        print(f"    Calendar at {first_str}, advancing {weeks_behind} week(s) to reach today")
+        for _ in range(weeks_behind):
+            await page.get_by_label("Show next week").click()
+            await page.wait_for_timeout(1500)
+
     all_classes = []
-    today_str = _date.today().strftime("%Y-%m-%d")
-    future_weeks_scraped = 0
 
-    # Wix headless may load on a historical week. Advance up to 8 weeks to
-    # find future dates, then scrape exactly 2 weeks of upcoming classes.
-    for week in range(8):
+    # Scrape today's week + next week (2 weeks of upcoming classes)
+    for week in range(2):
         if week > 0:
-            try:
-                await page.get_by_label("Show next week").click()
-                await page.wait_for_timeout(2000)
-            except Exception:
-                break
+            await page.get_by_label("Show next week").click()
+            await page.wait_for_timeout(2000)
 
-        # Collect all day cells and their ISO dates
-        # Note: "Available Spots" indicator is only visible in headed browsers;
-        # in headless mode we click every day and check for actual class data.
-        grid_cells = page.locator('[role="gridcell"]')
-        n = await grid_cells.count()
-        days_to_scrape = []
-
-        for idx in range(n):
-            cell = grid_cells.nth(idx)
-            # Skip disabled cells (past dates)
-            is_disabled = await cell.get_attribute("disabled")
-            if is_disabled is not None:
-                continue
-            # Prefer data-date attribute (e.g. "2026-7-7") over parsing inner text
-            data_date = await cell.get_attribute("data-date")
-            if data_date:
-                parts = data_date.split("-")
-                if len(parts) == 3:
-                    date_str = f"{parts[0]}-{int(parts[1]):02d}-{int(parts[2]):02d}"
-                else:
-                    continue
-            else:
-                text = await cell.inner_text()
-                dm = DATE_CELL_RE.search(text)
-                if not dm:
-                    continue
-                month_num = MONTH_MAP.get(dm.group(1).lower())
-                if not month_num:
-                    continue
-                date_str = f"{dm.group(3)}-{month_num:02d}-{int(dm.group(2)):02d}"
-            # Skip past dates — Wix headless may load on a historical week
-            if date_str < today_str:
-                continue
-            days_to_scrape.append((idx, date_str))
-
-        # Entire week is in the past — keep advancing
-        if not days_to_scrape:
-            continue
+        days_to_scrape = [
+            (idx, date_str)
+            for idx, date_str in await _cell_dates(page)
+            if date_str >= today_str
+        ]
 
         for idx, date_str in days_to_scrape:
-            # Re-query cells each time (Wix may re-render the grid after click)
             cell = page.locator('[role="gridcell"]').nth(idx)
             await cell.click()
             await page.wait_for_timeout(1500)
 
-            # The class list lives in the group element that contains "Book" buttons
-            # Read inner_text of the first such group that has class data
             try:
                 container = page.locator('[role="group"]').filter(has_text="Book").first
                 section_text = await container.inner_text(timeout=5000)
@@ -207,10 +196,6 @@ async def scrape(page):
             day_classes = _parse_classes(lines, date_str)
             all_classes.extend(day_classes)
             print(f"    {date_str}: {len(day_classes)} classes")
-
-        future_weeks_scraped += 1
-        if future_weeks_scraped >= 2:
-            break
 
     print(f"    → {len(all_classes)} total TADS classes")
 
