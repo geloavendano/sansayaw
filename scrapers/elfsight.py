@@ -99,6 +99,16 @@ SITES = [
         "instagram": "https://www.instagram.com/theplayground.studios.ph",
         "photo_url": None,
     },
+    {
+        "id": "spac3",
+        "name": "SPAC3 Studios",
+        "branch": None,
+        "address": "Pacific Century Tower, G/F Scout Borromeo St, Diliman, Quezon City",
+        "url": "https://spacestudiosph.com/pages/classes",
+        "website": "https://spacestudiosph.com",
+        "instagram": "https://www.instagram.com/spac3_ph",
+        "photo_url": None,
+    },
 ]
 
 
