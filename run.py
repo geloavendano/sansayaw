@@ -4,7 +4,7 @@ import urllib.request
 
 from playwright.async_api import async_playwright
 
-from scrapers import elfsight, nudefloor, studio808, tads, kidlat
+from scrapers import elfsight, nudefloor, studio808, tads, kidlat, ember
 from scrapers import normalize
 from scrapers.db import (
     seed_studios,
@@ -14,7 +14,7 @@ from scrapers.db import (
     insert_classes,
 )
 
-ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES + [tads.SITE] + [kidlat.SITE]
+ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES + [tads.SITE] + [kidlat.SITE] + [ember.SITE]
 
 
 def _revalidate_frontend():
@@ -119,6 +119,15 @@ async def main():
             errors.append(f"tads: {e}")
             print(f"  TADS ERROR: {e}")
 
+        # ── Ember Dance and Arts — Wix Bookings daily agenda ─────────────────
+        ember_data = None
+        try:
+            ember_data = await ember.scrape(page)
+            all_rows += _build_class_rows(ember_data, {}, run_id, is_caps=False)
+        except Exception as e:
+            errors.append(f"ember: {e}")
+            print(f"  Ember ERROR: {e}")
+
         await browser.close()
 
     # ── Kidlat — Rezerv API (no browser needed) ───────────────────────────
@@ -141,7 +150,7 @@ async def main():
 
     # 808 Studio and TADS are best-effort; failures don't degrade the run.
     # Only mark partial if a core scraper (elfsight / nudefloor) errored.
-    core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc", "tads", "kidlat"))]
+    core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc", "tads", "kidlat", "ember"))]
     status = "partial" if core_errors else "success"
     finish_scrape_run(run_id, status)
 
@@ -157,6 +166,8 @@ async def main():
         all_summary.append(tads_data)
     if kidlat_data:
         all_summary.append(kidlat_data)
+    if ember_data:
+        all_summary.append(ember_data)
     for s in all_summary:
         branch = f" ({s['branch']})" if s.get("branch") else ""
         flag = " ⚠" if s.get("error") else ""
