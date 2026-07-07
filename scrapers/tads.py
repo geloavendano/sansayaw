@@ -18,6 +18,7 @@ Each class entry in the inner_text looks like:
 """
 
 import re
+from datetime import date as _date
 
 SITE = {
     "id":        "tads",
@@ -135,8 +136,11 @@ async def scrape(page):
     await page.wait_for_timeout(2000)
 
     all_classes = []
+    today_str = _date.today().strftime("%Y-%m-%d")
 
-    for week in range(2):
+    # Wix may load the calendar on the last published week rather than the
+    # current one. Advance up to 4 weeks to find a week with future dates.
+    for week in range(4):
         if week > 0:
             try:
                 await page.get_by_label("Show next week").click()
@@ -174,7 +178,17 @@ async def scrape(page):
                 if not month_num:
                     continue
                 date_str = f"{dm.group(3)}-{month_num:02d}-{int(dm.group(2)):02d}"
+            # Skip past dates — Wix may load on a historical week
+            if date_str < today_str:
+                continue
             days_to_scrape.append((idx, date_str))
+
+        # If this whole week is in the past, keep advancing; otherwise scrape it
+        if not days_to_scrape:
+            continue
+        # Once we've scraped 2 weeks of future dates, stop
+        if len(all_classes) > 0 and week >= 2:
+            break
 
         for idx, date_str in days_to_scrape:
             # Re-query cells each time (Wix may re-render the grid after click)
