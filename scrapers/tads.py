@@ -22,7 +22,7 @@ from datetime import date as _date
 
 SITE = {
     "id":        "tads",
-    "name":      "TADS",
+    "name":      "The Addlib Dance Studio",
     "branch":    None,
     "address":   "2F New Frontier Theater Arcade, 7 Gen. Malvar Ave., Araneta City, Quezon City",
     "source_url": "https://www.tadsph.com/booknow",

@@ -5,7 +5,7 @@ SITE = {
     "id": "nudefloor",
     "name": "Nude Floor",
     "branch": None,
-    "address": "Nude Floor, Manila",
+    "address": "3rd Floor Ayala Malls Circuit, Hippodromo Street, Makati",
     "url": "https://www.nudefloor.com/book-a-class",
     "website": "https://www.nudefloor.com",
     "instagram": "https://www.instagram.com/nudefloor",
