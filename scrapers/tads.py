@@ -137,10 +137,11 @@ async def scrape(page):
 
     all_classes = []
     today_str = _date.today().strftime("%Y-%m-%d")
+    future_weeks_scraped = 0
 
-    # Wix may load the calendar on the last published week rather than the
-    # current one. Advance up to 4 weeks to find a week with future dates.
-    for week in range(4):
+    # Wix headless may load on a historical week. Advance up to 8 weeks to
+    # find future dates, then scrape exactly 2 weeks of upcoming classes.
+    for week in range(8):
         if week > 0:
             try:
                 await page.get_by_label("Show next week").click()
@@ -178,17 +179,14 @@ async def scrape(page):
                 if not month_num:
                     continue
                 date_str = f"{dm.group(3)}-{month_num:02d}-{int(dm.group(2)):02d}"
-            # Skip past dates — Wix may load on a historical week
+            # Skip past dates — Wix headless may load on a historical week
             if date_str < today_str:
                 continue
             days_to_scrape.append((idx, date_str))
 
-        # If this whole week is in the past, keep advancing; otherwise scrape it
+        # Entire week is in the past — keep advancing
         if not days_to_scrape:
             continue
-        # Once we've scraped 2 weeks of future dates, stop
-        if len(all_classes) > 0 and week >= 2:
-            break
 
         for idx, date_str in days_to_scrape:
             # Re-query cells each time (Wix may re-render the grid after click)
@@ -209,6 +207,10 @@ async def scrape(page):
             day_classes = _parse_classes(lines, date_str)
             all_classes.extend(day_classes)
             print(f"    {date_str}: {len(day_classes)} classes")
+
+        future_weeks_scraped += 1
+        if future_weeks_scraped >= 2:
+            break
 
     print(f"    → {len(all_classes)} total TADS classes")
 
