@@ -60,11 +60,23 @@ function studioColor(id) {
   if (id.startsWith('808'))   return '#b39dff'; // 808 Studio — lavender
   return T.textDim;
 }
+// City per studio — shown under the name. The branch is already part of
+// studioName(), so repeating it here would be redundant.
+const STUDIO_CITY = {
+  '808_podium':             'Mandaluyong',
+  '808_bgc':                'Taguig',
+  ember:                    'San Juan',
+  kidlat:                   'San Juan',
+  nudefloor:                'Makati',
+  spac3:                    'Quezon City',
+  tads:                     'Quezon City',
+  playground:               'San Juan',
+  zero_studio_qc:           'Quezon City',
+  zero_studio_mandaluyong:  'Mandaluyong',
+};
 function studioLoc(s) {
   if (!s) return '';
-  if (s.branch) return s.branch;
-  const map = { playground: 'San Juan, Metro Manila', nudefloor: 'Manila' };
-  return map[s.id] || '';
+  return STUDIO_CITY[s.id] || '';
 }
 function studioName(s) {
   if (!s) return '';
