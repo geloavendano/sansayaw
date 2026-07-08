@@ -24,6 +24,7 @@ SITE = {
     "source_url": "https://www.emberdanceandarts.com/book-a-class",
     "website":    "https://www.emberdanceandarts.com",
     "instagram":  "https://www.instagram.com/emberdanceandarts",
+    "maps_url":   "https://maps.app.goo.gl/X3hDxoA3eAgb7gAN7",
     "photo_url":  None,
 }
 

@@ -19,6 +19,7 @@ SITE = {
     "source_url": "https://kidlatdancestudio.com/timetable",
     "website":   "https://kidlatdancestudio.com",
     "instagram": "https://www.instagram.com/kidlatdancestudio",
+    "maps_url":  "https://maps.app.goo.gl/XWDaWGU4hcZQ8Z2z5",
     "photo_url": None,
 }
 

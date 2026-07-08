@@ -28,6 +28,7 @@ SITE = {
     "source_url": "https://www.tadsph.com/booknow",
     "website":   "https://www.tadsph.com",
     "instagram": "https://www.instagram.com/tads.ph",
+    "maps_url":  "https://maps.app.goo.gl/C2Rdt7vVYPppzQQ98",
     "photo_url": None,
 }
 

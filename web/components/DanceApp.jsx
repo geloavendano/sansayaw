@@ -233,6 +233,32 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
   const [query, setQuery]                     = useState('');
   const [selClass, setSelClass]               = useState(null);
 
+  // Deep link: open a class drawer from ?class=<id> (&instructor=<id>).
+  // Class ids rotate with each scrape run, so stale links just load the app.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('class');
+    if (!id) return;
+    const c = classes.find(x => String(x.id) === id);
+    if (!c) return;
+    const [y, mo, d] = c.date.split('-').map(Number);
+    setDate(new Date(y, mo - 1, d));
+    setSelClass(c);
+  }, []);
+
+  // Keep the URL shareable while a drawer is open
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (selClass) {
+      url.searchParams.set('class', String(selClass.id));
+      if (selClass.instructor_id) url.searchParams.set('instructor', String(selClass.instructor_id));
+      else url.searchParams.delete('instructor');
+    } else {
+      url.searchParams.delete('class');
+      url.searchParams.delete('instructor');
+    }
+    window.history.replaceState(null, '', url);
+  }, [selClass]);
+
   const dateCount = useMemo(() => {
     const c = {};
     classes.forEach(cl => { c[cl.date] = (c[cl.date]||0)+1; });
@@ -1362,7 +1388,7 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
               <div style={{ fontFamily: T.headingFont, fontSize: 16, fontWeight: 600 }}>{sNm}</div>
               {sLc && (() => {
                 const mapsQ = encodeURIComponent(studio?.address ? `${sNm} ${studio.address}` : `${sNm} ${sLc}`);
-                const mapsHref = `https://maps.google.com/?q=${mapsQ}`;
+                const mapsHref = studio?.maps_url || `https://maps.google.com/?q=${mapsQ}`;
                 return (
                   <a href={mapsHref} target="_blank" rel="noopener noreferrer"
                     style={{ fontSize: 12.5, color: T.textDim, marginTop: 2, display: 'flex', alignItems: 'center', gap: 5, textDecoration: 'none' }}>

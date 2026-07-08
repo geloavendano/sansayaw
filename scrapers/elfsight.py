@@ -107,7 +107,11 @@ SITES = [
         "url": "https://spacestudiosph.com/pages/classes",
         "website": "https://spacestudiosph.com",
         "instagram": "https://www.instagram.com/spac3_ph",
+        "maps_url": "https://maps.app.goo.gl/ZfewEFxPdZwwqNWL9",
         "photo_url": None,
+        # Cards stack "CLASS STYLE / INSTRUCTOR / LEVEL" on separate lines
+        # instead of the "INSTRUCTOR: CLASS" title format
+        "stacked_title": True,
     },
 ]
 
@@ -120,7 +124,7 @@ def _split_instructor(title):
     return None, title
 
 
-def parse_text(raw_text, tz_correction=None):
+def parse_text(raw_text, tz_correction=None, stacked_title=False):
     """
     Parse Elfsight Events Calendar rendered text into a list of class dicts.
 
@@ -132,6 +136,11 @@ def parse_text(raw_text, tz_correction=None):
         HH:MM AM - HH:MM PM
         [VENUE]           ← optional
         REGISTER ...      ← button text, marks end of block
+
+    With stacked_title=True (SPAC3), the lines before the time are instead:
+        CLASS STYLE       ← e.g. "Basic Femme", "Open Choreography"
+        INSTRUCTOR        ← e.g. "ZEN"
+        LEVEL             ← e.g. "BEGINNERS" (becomes the genre)
     """
     if tz_correction is None:
         tz_correction = _pht_correction()
@@ -200,15 +209,21 @@ def parse_text(raw_text, tz_correction=None):
         if not before:
             continue
 
-        title_raw = before[-1]
-        genre = " / ".join(before[:-1]) if len(before) > 1 else None
-
         # Optional venue: first line after time if it's not a register button
         venue = None
         if after and not REGISTER_RE.match(after[0]):
             venue = after[0]
 
-        instructor, class_name = _split_instructor(title_raw)
+        if stacked_title and len(before) >= 2:
+            level = before[-1]
+            instructor = before[-2]
+            style_parts = before[:-2]
+            class_name = " / ".join(style_parts) if style_parts else level
+            genre = level if style_parts else None
+        else:
+            title_raw = before[-1]
+            genre = " / ".join(before[:-1]) if len(before) > 1 else None
+            instructor, class_name = _split_instructor(title_raw)
 
         classes.append({
             "date": date_str,
@@ -241,7 +256,7 @@ async def scrape(page, site):
     main = page.locator("main")
     raw_text = await main.inner_text()
 
-    classes = parse_text(raw_text)
+    classes = parse_text(raw_text, stacked_title=site.get("stacked_title", False))
     print(f"    → {len(classes)} classes found")
 
     # Extract instructor photos from Elfsight card images.

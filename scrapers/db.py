@@ -29,12 +29,19 @@ def seed_studios(studios):
             "source_url": s.get("source_url") or s.get("url"),
             "website":    s.get("website"),
             "instagram":  s.get("instagram"),
-            # photo_url is managed manually — never overwrite with None
+            # maps_url / photo_url may be set manually — never overwrite with None
+            **({"maps_url": s["maps_url"]} if s.get("maps_url") else {}),
             **({"photo_url": s["photo_url"]} if s.get("photo_url") else {}),
         }
         for s in studios
     ]
-    client.schema("sansayaw").table("studios").upsert(rows).execute()
+    try:
+        client.schema("sansayaw").table("studios").upsert(rows).execute()
+    except Exception:
+        # maps_url column may not exist yet (migration_studios_maps_url.sql)
+        for r in rows:
+            r.pop("maps_url", None)
+        client.schema("sansayaw").table("studios").upsert(rows).execute()
 
 
 def resolve_instructors(pairs):
