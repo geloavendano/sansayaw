@@ -28,8 +28,10 @@ async function fetchAppData() {
   const runId      = runRow?.id;
   const lastUpdated = runRow?.scraped_at || null;
   const studios    = studiosRes.data || [];
+  // Keyed by id (stable, survives duplicate names) and by name (legacy fallback)
   const instrs     = {};
   (instrsRes.data || []).forEach(i => { instrs[i.name] = i; });
+  (instrsRes.data || []).forEach(i => { instrs[i.id] = i; });
 
   if (!runId) return { studios, instrs, classes: [], lastUpdated };
 

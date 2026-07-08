@@ -376,7 +376,7 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
           <ClassDetailSheet
             c={selClass}
             studio={studios.find(s => s.id === selClass.studioId)}
-            instrInfo={instrs[selClass.instructor]}
+            instrInfo={instrs[selClass.instructor_id] || instrs[selClass.instructor]}
             TODAY={TODAY}
             onClose={() => setSelClass(null)}
           />
@@ -750,8 +750,24 @@ function FilterSheet({ studios, enabledStudios, setEnabledStudios, onClose }) {
   };
   const allOn = enabledStudios.size === studios.length;
 
+  const footer = (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button onClick={() => setEnabledStudios(new Set(allOn ? [] : studios.map(s => s.id)))} style={{
+        flex: 1, padding: '12px 0', background: 'transparent',
+        border: '1px solid ' + T.borderStrong, borderRadius: T.pill,
+        color: T.text, fontFamily: T.bodyFont, fontSize: 13, fontWeight: 500, cursor: 'pointer',
+      }}>{allOn ? 'Clear all' : 'Select all'}</button>
+      <button onClick={onClose} style={{
+        flex: 1.4, padding: '12px 0', background: T.accent, color: T.accentOn,
+        border: '1px solid ' + T.accent, borderRadius: T.pill,
+        fontFamily: T.bodyFont, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+        boxShadow: T.accentGlow,
+      }}>Apply</button>
+    </div>
+  );
+
   return (
-    <Sheet onClose={onClose} title="Studios">
+    <Sheet onClose={onClose} title="Studios" footer={footer}>
       <div style={{ fontSize: 12.5, color: T.textDim, padding: '0 22px 14px' }}>Show classes from</div>
       <div style={{ padding: '0 16px' }}>
         {studios.map((s, i) => {
@@ -775,19 +791,6 @@ function FilterSheet({ studios, enabledStudios, setEnabledStudios, onClose }) {
           );
         })}
       </div>
-      <div style={{ display: 'flex', gap: 8, padding: '16px 20px 4px' }}>
-        <button onClick={() => setEnabledStudios(new Set(allOn ? [] : studios.map(s => s.id)))} style={{
-          flex: 1, padding: '12px 0', background: 'transparent',
-          border: '1px solid ' + T.borderStrong, borderRadius: T.pill,
-          color: T.text, fontFamily: T.bodyFont, fontSize: 13, fontWeight: 500, cursor: 'pointer',
-        }}>{allOn ? 'Clear all' : 'Select all'}</button>
-        <button onClick={onClose} style={{
-          flex: 1.4, padding: '12px 0', background: T.accent, color: T.accentOn,
-          border: '1px solid ' + T.accent, borderRadius: T.pill,
-          fontFamily: T.bodyFont, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-          boxShadow: T.accentGlow,
-        }}>Apply</button>
-      </div>
     </Sheet>
   );
 }
@@ -806,18 +809,18 @@ function Checkbox({ on }) {
   );
 }
 
-function Sheet({ onClose, title, children }) {
+function Sheet({ onClose, title, children, footer }) {
   const [dragY, setDragY] = useState(0);
   const startRef = useRef(null);
-  const panelRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const handleTouchStart = e => {
     startRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
   const handleTouchMove = e => {
     if (!startRef.current) return;
-    const panel = panelRef.current;
-    if (panel && panel.scrollTop > 0) return;
+    const sc = scrollRef.current;
+    if (sc && sc.scrollTop > 0) return;
     const dx = e.touches[0].clientX - startRef.current.x;
     const dy = e.touches[0].clientY - startRef.current.y;
     if (dy > 0 && dy > Math.abs(dx)) setDragY(dy);
@@ -831,7 +834,6 @@ function Sheet({ onClose, title, children }) {
     <div style={{ position: 'absolute', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
       <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}/>
       <div
-        ref={panelRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -839,22 +841,29 @@ function Sheet({ onClose, title, children }) {
           position: 'relative', background: T.bgSoft,
           borderTop: '1px solid ' + T.borderStrong,
           borderTopLeftRadius: 22, borderTopRightRadius: 22,
-          paddingBottom: 22, maxHeight: '82%', overflowY: 'auto',
+          maxHeight: '82%', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
           transform: `translateY(${dragY}px)`,
           transition: dragY === 0 ? 'transform .3s cubic-bezier(.2,.7,.3,1)' : 'none',
           willChange: 'transform',
         }}>
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 6px' }}>
+        <div style={{ flex: '0 0 auto', display: 'flex', justifyContent: 'center', padding: '10px 0 6px' }}>
           <div style={{ width: 36, height: 4, borderRadius: 2, background: T.borderStrong }}/>
         </div>
-        <div style={{ padding: '10px 22px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ flex: '0 0 auto', padding: '10px 22px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontFamily: T.headingFont, fontSize: 17, fontWeight: 600, color: T.text, letterSpacing: '-0.01em' }}>{title}</div>
           <button onClick={onClose} style={{ background: 'transparent', border: 0, color: T.textDim, cursor: 'pointer', padding: 4 }}>
             <Icon.x/>
           </button>
         </div>
-        {children}
+        <div ref={scrollRef} style={{ flex: '0 1 auto', overflowY: 'auto', paddingBottom: footer ? 8 : 22 }}>
+          {children}
+        </div>
+        {footer && (
+          <div style={{ flex: '0 0 auto', borderTop: '1px solid ' + T.border, background: T.bgSoft, padding: '14px 20px 22px' }}>
+            {footer}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1378,12 +1387,21 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontFamily: T.headingFont, fontSize: 16, fontWeight: 600 }}>{c.instructor}</div>
               {info.bio && <div style={{ fontSize: 12.5, color: T.textDim, marginTop: 2 }}>{info.bio}</div>}
-              {info.instagram && (
-                <a href={info.instagram} target="_blank" rel="noopener noreferrer"
-                  style={{ fontFamily: T.monoFont, fontSize: 11.5, color: T.accent, marginTop: 4, display: 'block', textDecoration: 'none' }}>
-                  {info.instagram.replace('https://www.instagram.com/','@').replace(/\/$/,'')}
-                </a>
-              )}
+              {(() => {
+                // instagram may be stored as a full URL, "@handle", or bare handle
+                const raw = (info.instagram || '').trim();
+                if (!raw) return null;
+                const handle = raw.startsWith('http')
+                  ? raw.replace(/\/$/, '').split('/').pop()
+                  : raw.replace(/^@/, '');
+                if (!handle) return null;
+                return (
+                  <a href={`https://www.instagram.com/${handle}`} target="_blank" rel="noopener noreferrer"
+                    style={{ fontFamily: T.monoFont, fontSize: 11.5, color: T.accent, marginTop: 4, display: 'block', textDecoration: 'none' }}>
+                    @{handle}
+                  </a>
+                );
+              })()}
             </div>
           </div>
 
