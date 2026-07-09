@@ -80,3 +80,19 @@ def genre(value, is_caps=True):
     if is_caps:
         return _title(value)
     return value.strip()
+
+
+# Matches "Kpop", "K-pop", "K Pop", "K*POP", "KPOP" — studios spell it every
+# possible way, and it's sometimes buried in class_name with no genre set.
+_KPOP_RE = re.compile(r"\bk[\s\-\*]?pop\b", re.IGNORECASE)
+
+
+def apply_genre_overrides(class_name, genre):
+    """
+    Force a consistent genre tag when the class name or genre text signals
+    a category we want unified, regardless of studio spelling. Currently:
+    any K-pop variant → "K-POP".
+    """
+    if _KPOP_RE.search(f"{class_name or ''} {genre or ''}"):
+        return "K-POP"
+    return genre

@@ -43,14 +43,16 @@ def _build_class_rows(studio_data, instructor_map, run_id, is_caps):
     for cls in studio_data["classes"]:
         raw_instructor = cls.get("instructor")
         norm_instructor = normalize.instructor(raw_instructor, is_caps=is_caps)
+        norm_class_name = normalize.class_name(cls["class_name"], is_caps=is_caps)
+        norm_genre = normalize.genre(cls.get("genre"), is_caps=is_caps)
         rows.append({
             "scrape_run_id": run_id,
             "studio_id":     studio_data["id"],
             "instructor_id": instructor_map.get(norm_instructor) if norm_instructor else None,
             "instructor":    norm_instructor,
             "date":          cls["date"],
-            "class_name":    normalize.class_name(cls["class_name"], is_caps=is_caps),
-            "genre":         normalize.genre(cls.get("genre"), is_caps=is_caps),
+            "class_name":    norm_class_name,
+            "genre":         normalize.apply_genre_overrides(norm_class_name, norm_genre),
             "time_range":    cls.get("time"),
             "venue":         cls.get("venue"),
         })
