@@ -348,7 +348,7 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
             />
           )}
           {tab === 'contact' && (
-            <ContactTab isDesktop={isDesktop} lastUpdated={lastUpdated} />
+            <ContactTab isDesktop={isDesktop} lastUpdated={lastUpdated} studios={studios} />
           )}
         </div>
 
@@ -1106,7 +1106,60 @@ function SectionLabel({ children }) {
 // ─────────────────────────────────────────────────────────────
 // ABOUT / CONTACT TAB
 // ─────────────────────────────────────────────────────────────
-function ContactTab({ isDesktop, lastUpdated }) {
+// Group studio rows (which can have one row per branch, e.g. ZERØ QC / Mandaluyong)
+// into one card per studio name, listing all its cities together.
+function groupStudiosByName(studios) {
+  const groups = new Map();
+  for (const s of studios) {
+    const key = s.name;
+    if (!groups.has(key)) {
+      groups.set(key, { name: s.name, cities: [], website: s.website, instagram: s.instagram, id: s.id });
+    }
+    const g = groups.get(key);
+    const city = studioLoc(s);
+    if (city && !g.cities.includes(city)) g.cities.push(city);
+    if (!g.website && s.website) g.website = s.website;
+    if (!g.instagram && s.instagram) g.instagram = s.instagram;
+  }
+  return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function StudioListRow({ studio, last }) {
+  const igHandle = studio.instagram
+    ? studio.instagram.replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/$/, '')
+    : null;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12, padding: '13px 0',
+      borderBottom: last ? 'none' : '1px solid ' + T.border,
+    }}>
+      <span style={{ width: 8, height: 8, borderRadius: 999, background: studioColor(studio.id), flex: '0 0 auto' }}/>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: T.headingFont, fontSize: 14.5, fontWeight: 600 }}>{studio.name}</div>
+        {studio.cities.length > 0 && (
+          <div style={{ fontSize: 12, color: T.textDim, marginTop: 1 }}>{studio.cities.join(' · ')}</div>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 10, flex: '0 0 auto' }}>
+        {studio.website && (
+          <a href={studio.website} target="_blank" rel="noopener noreferrer"
+            style={{ color: T.textDim, display: 'flex', alignItems: 'center' }} aria-label={`${studio.name} website`}>
+            <Icon.globe s={15}/>
+          </a>
+        )}
+        {igHandle && (
+          <a href={`https://www.instagram.com/${igHandle}`} target="_blank" rel="noopener noreferrer"
+            style={{ color: T.textDim, fontFamily: T.headingFont, fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center' }}
+            aria-label={`${studio.name} Instagram`}>@</a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ContactTab({ isDesktop, lastUpdated, studios }) {
+  const studioGroups = useMemo(() => groupStudiosByName(studios || []), [studios]);
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <TopBar showWordmark={!isDesktop} />
@@ -1118,11 +1171,23 @@ function ContactTab({ isDesktop, lastUpdated }) {
             One place to find every open dance class in Metro Manila.
           </div>
           <div style={{ marginTop: 14, fontSize: 14, lineHeight: 1.6, color: T.textDim }}>
-            We pull schedules from Zero Studio, The Playground Studios, and Nude Floor so
+            We pull schedules from {studioGroups.length} studios across the metro so
             you stop juggling six Instagram tabs at 11pm trying to find a 7am class.
           </div>
           <div style={{ marginTop: 10, fontSize: 13, lineHeight: 1.6, color: T.textMute }}>
             This is a volunteer, community-driven project. All information is sourced from publicly available studio pages.
+          </div>
+        </div>
+
+        <div style={{ padding: '22px 18px', borderTop: '1px solid ' + T.border }}>
+          <SectionLabel>Studios we feature</SectionLabel>
+          <div style={{ fontFamily: T.headingFont, fontSize: 19, fontWeight: 600, letterSpacing: '-0.01em', marginBottom: 10 }}>
+            {studioGroups.length} studios, one schedule
+          </div>
+          <div>
+            {studioGroups.map((s, i) => (
+              <StudioListRow key={s.id} studio={s} last={i === studioGroups.length - 1} />
+            ))}
           </div>
         </div>
 
