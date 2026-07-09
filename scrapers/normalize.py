@@ -12,8 +12,13 @@ def _title(text):
     """
     Title-case a string with three fixes over str.title():
       1. Small conjunctions/prepositions stay lowercase mid-title
-      2. Apostrophe fix: "Don'T" → "Don't"
+      2. Apostrophes never trigger capitalizing the next letter, so
+         possessives/contractions read naturally: "Kevin's" not "Kevin'S",
+         "Don't" not "Don'T". Hyphens still capitalize each part:
+         "Beg-Int" not "Beg-int".
       3. Known abbreviations restored to uppercase
+    A leading digit blocks the "capitalize first letter" pass, so ordinals
+    stay lowercase: "1st" not "1St".
     """
     if not text:
         return text
@@ -34,14 +39,17 @@ def _title(text):
             result.append(word.lower())
             continue
 
-        # Standard title-case: capitalize first alpha char, lowercase the rest
+        # Standard title-case: capitalize first alpha char and after each
+        # hyphen; apostrophes are left alone so "'s"/"'t"/"'em" stay lowercase
         cased = re.sub(
-            r"(['\-]?)([A-Za-z])",
+            r"(-?)([A-Za-z])",
             lambda m: m.group(1) + (m.group(2).upper() if m.start() == 0 or m.group(1) else m.group(2).lower()),
             word.lower(),
         )
-        # Ensure first alpha character is uppercase
-        cased = re.sub(r"^([^A-Za-z]*)([a-z])", lambda m: m.group(1) + m.group(2).upper(), cased)
+        # Capitalize the first letter when it's preceded only by punctuation/
+        # emoji (e.g. "⚪️femme" → "⚪️Femme"), but not when preceded by a
+        # digit, since that's an ordinal/measurement, not decoration.
+        cased = re.sub(r"^([^A-Za-z0-9]*)([a-z])", lambda m: m.group(1) + m.group(2).upper(), cased)
         result.append(cased)
 
     return " ".join(result)

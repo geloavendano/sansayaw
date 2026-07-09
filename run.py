@@ -38,13 +38,22 @@ def _revalidate_frontend():
         print(f"  [revalidate] WARNING: could not bust cache: {e}")
 
 
-def _build_class_rows(studio_data, instructor_map, run_id, is_caps):
+def _build_class_rows(studio_data, instructor_map, run_id, is_caps, text_is_caps=None):
+    """
+    is_caps controls the instructor field; text_is_caps controls class_name
+    and genre, defaulting to is_caps when not given. Split for studios like
+    TADS where class names are ALL CAPS at the source but instructor names
+    are already properly cased (including initials like "JB", "RD") — title
+    -casing those would wrongly lowercase them to "Jb", "Rd".
+    """
+    if text_is_caps is None:
+        text_is_caps = is_caps
     rows = []
     for cls in studio_data["classes"]:
         raw_instructor = cls.get("instructor")
         norm_instructor = normalize.instructor(raw_instructor, is_caps=is_caps)
-        norm_class_name = normalize.class_name(cls["class_name"], is_caps=is_caps)
-        norm_genre = normalize.genre(cls.get("genre"), is_caps=is_caps)
+        norm_class_name = normalize.class_name(cls["class_name"], is_caps=text_is_caps)
+        norm_genre = normalize.genre(cls.get("genre"), is_caps=text_is_caps)
         rows.append({
             "scrape_run_id": run_id,
             "studio_id":     studio_data["id"],
@@ -113,11 +122,11 @@ async def main():
                 errors.append(f"{studio_data['id']}: {studio_data['error']}")
             all_rows += _build_class_rows(studio_data, {}, run_id, is_caps=True)
 
-        # ── TADS — Wix Bookings (mixed-case source) ──────────────────────────
+        # ── TADS — Wix Bookings (ALL CAPS class names, mixed-case instructors) ──
         tads_data = None
         try:
             tads_data = await tads.scrape(page)
-            all_rows += _build_class_rows(tads_data, {}, run_id, is_caps=False)
+            all_rows += _build_class_rows(tads_data, {}, run_id, is_caps=False, text_is_caps=True)
         except Exception as e:
             errors.append(f"tads: {e}")
             print(f"  TADS ERROR: {e}")
