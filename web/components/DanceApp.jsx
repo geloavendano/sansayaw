@@ -742,13 +742,31 @@ function EmptyState() {
 // ─────────────────────────────────────────────────────────────
 // FILTER SHEET
 // ─────────────────────────────────────────────────────────────
+// Group studios by city (in studio list order within each group), cities
+// sorted alphabetically. Studios with no known city fall into "Other".
+function groupStudiosByCity(studios) {
+  const map = new Map();
+  for (const s of studios) {
+    const city = studioLoc(s) || 'Other';
+    if (!map.has(city)) map.set(city, []);
+    map.get(city).push(s);
+  }
+  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
+
 function FilterSheet({ studios, enabledStudios, setEnabledStudios, onClose }) {
   const toggle = id => {
     const next = new Set(enabledStudios);
     next.has(id) ? next.delete(id) : next.add(id);
     setEnabledStudios(next);
   };
+  const toggleGroup = (groupStudios, groupAllOn) => {
+    const next = new Set(enabledStudios);
+    groupStudios.forEach(s => groupAllOn ? next.delete(s.id) : next.add(s.id));
+    setEnabledStudios(next);
+  };
   const allOn = enabledStudios.size === studios.length;
+  const cityGroups = useMemo(() => groupStudiosByCity(studios), [studios]);
 
   const footer = (
     <div style={{ display: 'flex', gap: 8 }}>
@@ -770,24 +788,44 @@ function FilterSheet({ studios, enabledStudios, setEnabledStudios, onClose }) {
     <Sheet onClose={onClose} title="Studios" footer={footer}>
       <div style={{ fontSize: 12.5, color: T.textDim, padding: '0 22px 14px' }}>Show classes from</div>
       <div style={{ padding: '0 16px' }}>
-        {studios.map((s, i) => {
-          const on = enabledStudios.has(s.id);
+        {cityGroups.map(([city, groupStudios], gi) => {
+          const onCount = groupStudios.filter(s => enabledStudios.has(s.id)).length;
+          const groupAllOn = onCount === groupStudios.length;
+          const groupSomeOn = onCount > 0 && !groupAllOn;
           return (
-            <button key={s.id} onClick={() => toggle(s.id)} style={{
-              width: '100%', display: 'flex', alignItems: 'center', gap: 14,
-              padding: '14px 12px', background: 'transparent',
-              border: 0, borderBottom: i === studios.length-1 ? 'none' : '1px solid ' + T.border,
-              cursor: 'pointer', color: T.text, textAlign: 'left', fontFamily: T.bodyFont,
-            }}>
-              <Checkbox on={on} />
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: 999, background: studioColor(s.id) }}/>
-                  <span style={{ fontSize: 15, fontWeight: 500, fontFamily: T.headingFont }}>{studioName(s)}</span>
-                </div>
-                <div style={{ fontSize: 12, color: T.textDim, marginTop: 3, marginLeft: 15 }}>{studioLoc(s)}</div>
-              </div>
-            </button>
+            <div key={city} style={{ marginTop: gi === 0 ? 0 : 6 }}>
+              <button onClick={() => toggleGroup(groupStudios, groupAllOn)} style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+                padding: '10px 12px', background: 'transparent', border: 0,
+                cursor: 'pointer', color: T.text, textAlign: 'left', fontFamily: T.bodyFont,
+              }}>
+                <Checkbox on={groupAllOn} indeterminate={groupSomeOn} />
+                <span style={{
+                  flex: 1, fontSize: 12, fontWeight: 600, color: T.textDim,
+                  letterSpacing: '.06em', textTransform: 'uppercase',
+                }}>{city}</span>
+                <span style={{ fontSize: 11.5, color: T.textMute }}>{onCount}/{groupStudios.length}</span>
+              </button>
+              {groupStudios.map((s, i) => {
+                const on = enabledStudios.has(s.id);
+                return (
+                  <button key={s.id} onClick={() => toggle(s.id)} style={{
+                    width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '12px 12px 12px 30px', background: 'transparent',
+                    border: 0, borderBottom: i === groupStudios.length-1 ? 'none' : '1px solid ' + T.border,
+                    cursor: 'pointer', color: T.text, textAlign: 'left', fontFamily: T.bodyFont,
+                  }}>
+                    <Checkbox on={on} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: 999, background: studioColor(s.id) }}/>
+                        <span style={{ fontSize: 15, fontWeight: 500, fontFamily: T.headingFont }}>{studioName(s)}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           );
         })}
       </div>
@@ -795,16 +833,17 @@ function FilterSheet({ studios, enabledStudios, setEnabledStudios, onClose }) {
   );
 }
 
-function Checkbox({ on }) {
+function Checkbox({ on, indeterminate }) {
   return (
     <div style={{
       width: 22, height: 22, borderRadius: 6,
-      border: '1.5px solid ' + (on ? T.accent : T.borderStrong),
-      background: on ? T.accent : 'transparent', color: T.accentOn,
+      border: '1.5px solid ' + (on || indeterminate ? T.accent : T.borderStrong),
+      background: on || indeterminate ? T.accent : 'transparent', color: T.accentOn,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flex: '0 0 auto', transition: 'all .15s',
     }}>
       {on && <Icon.check s={14}/>}
+      {indeterminate && !on && <div style={{ width: 10, height: 2, borderRadius: 1, background: T.accentOn }}/>}
     </div>
   );
 }
