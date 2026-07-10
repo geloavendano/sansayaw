@@ -1,32 +1,10 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { T } from '@/lib/theme';
+import { studioColor, studioLoc, studioName } from '@/lib/studios';
 
 const INSTAPAY_QR_URL = '/instapay-qr.jpg';
-
-// ── THEME (Neon City) ────────────────────────────────────────
-const T = {
-  bg:           '#0a1820',
-  bgSoft:       '#0e2030',
-  panel:        'rgba(255,255,255,0.035)',
-  panelSolid:   '#112430',
-  border:       'rgba(190,235,245,0.08)',
-  borderStrong: 'rgba(190,235,245,0.18)',
-  text:         '#eaf6f7',
-  textDim:      'rgba(234,246,247,0.62)',
-  textMute:     'rgba(234,246,247,0.38)',
-  accent:       '#3ee0d8',
-  accentOn:     '#062028',
-  accentSoft:   'rgba(62,224,216,0.12)',
-  accentGlow:   '0 0 24px rgba(62,224,216,0.35)',
-  secondary:    '#ff6da3',
-  tertiary:     '#f5b15c',
-  headingFont:  "var(--font-geist-sans), 'Helvetica Neue', sans-serif",
-  bodyFont:     "var(--font-geist-sans), 'Helvetica Neue', sans-serif",
-  monoFont:     "var(--font-geist-mono), ui-monospace, monospace",
-  radius:       10,
-  pill:         999,
-};
 
 // ── TAB ORDER (used for swipe direction) ─────────────────────
 const TAB_ORDER = ['calendar', 'search', 'contact'];
@@ -49,38 +27,6 @@ function formatLastUpdated(ts) {
   const h = d.getHours(), m = d.getMinutes();
   const ampm = h < 12 ? 'AM' : 'PM';
   return dateStr + ' · ' + (h%12||12) + ':' + pad(m) + ' ' + ampm;
-}
-
-// ── STUDIO HELPERS ───────────────────────────────────────────
-function studioColor(id) {
-  if (!id) return T.textDim;
-  if (id.startsWith('zero'))  return T.accent;
-  if (id === 'playground')    return T.secondary;
-  if (id === 'nudefloor')     return T.tertiary;
-  if (id.startsWith('808'))   return '#b39dff'; // 808 Studio — lavender
-  return T.textDim;
-}
-// City per studio — shown under the name. The branch is already part of
-// studioName(), so repeating it here would be redundant.
-const STUDIO_CITY = {
-  '808_podium':             'Mandaluyong',
-  '808_bgc':                'Taguig',
-  ember:                    'San Juan',
-  kidlat:                   'San Juan',
-  nudefloor:                'Makati',
-  spac3:                    'Quezon City',
-  tads:                     'Quezon City',
-  playground:               'San Juan',
-  zero_studio_qc:           'Quezon City',
-  zero_studio_mandaluyong:  'Mandaluyong',
-};
-function studioLoc(s) {
-  if (!s) return '';
-  return STUDIO_CITY[s.id] || '';
-}
-function studioName(s) {
-  if (!s) return '';
-  return s.branch ? `${s.name} · ${s.branch}` : s.name;
 }
 
 // ── UTILS ────────────────────────────────────────────────────

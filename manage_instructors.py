@@ -14,6 +14,8 @@ Usage:
     python3 manage_instructors.py unassign "Jaja" kidlat   # remove a wrong rule
     python3 manage_instructors.py merge 123 456        # 456 was a duplicate of 123
     python3 manage_instructors.py set 123 --instagram @jajasagmayao --bio "HipHop · Femme"
+    python3 manage_instructors.py add-reel 123 https://www.instagram.com/reel/XXXXXXXXXXX/
+    python3 manage_instructors.py remove-reel 123 https://www.instagram.com/reel/XXXXXXXXXXX/
     python3 manage_instructors.py list [name-filter]
 """
 
@@ -46,7 +48,7 @@ def _fetch_instructors(s):
     return {
         r["id"]: r
         for r in s.table("instructors")
-        .select("id, name, display_name, bio, instagram, photo_url")
+        .select("id, name, display_name, bio, instagram, photo_url, reel_urls")
         .execute().data
     }
 
@@ -91,6 +93,8 @@ def _instructor_label(rec, aliases, studios):
     parts = [f"#{rec['id']} {name}"]
     if rec.get("instagram"):
         parts.append(rec["instagram"])
+    if rec.get("reel_urls"):
+        parts.append(f"{len(rec['reel_urls'])} reel(s)")
     if at:
         parts.append(f"teaches at {', '.join(at)}")
     return "  ·  ".join(parts)
@@ -212,6 +216,10 @@ def cmd_merge(args):
     for field in ("display_name", "bio", "instagram", "photo_url"):
         if not instructors[keep].get(field) and instructors[dup].get(field):
             patch[field] = instructors[dup][field]
+    # reel_urls is a list — union instead of only-copy-if-empty
+    merged_reels = list(dict.fromkeys((instructors[keep].get("reel_urls") or []) + (instructors[dup].get("reel_urls") or [])))
+    if merged_reels != (instructors[keep].get("reel_urls") or []):
+        patch["reel_urls"] = merged_reels
     if patch:
         s.table("instructors").update(patch).eq("id", keep).execute()
     s.table("instructors").delete().eq("id", dup).execute()
@@ -233,6 +241,30 @@ def cmd_set(args):
         sys.exit("Nothing to set — use --instagram / --bio / --photo / --display-name")
     s.table("instructors").update(patch).eq("id", args.id).execute()
     print(f"✓ Updated instructor #{args.id}: {patch}")
+
+
+def cmd_add_reel(args):
+    s = _s()
+    rec = s.table("instructors").select("id, reel_urls").eq("id", args.id).execute().data
+    if not rec:
+        sys.exit(f"No instructor #{args.id}")
+    urls = rec[0].get("reel_urls") or []
+    if args.url in urls:
+        print("Already added.")
+        return
+    urls.append(args.url)
+    s.table("instructors").update({"reel_urls": urls}).eq("id", args.id).execute()
+    print(f"✓ Added reel to instructor #{args.id} ({len(urls)} total)")
+
+
+def cmd_remove_reel(args):
+    s = _s()
+    rec = s.table("instructors").select("id, reel_urls").eq("id", args.id).execute().data
+    if not rec:
+        sys.exit(f"No instructor #{args.id}")
+    urls = [u for u in (rec[0].get("reel_urls") or []) if u != args.url]
+    s.table("instructors").update({"reel_urls": urls}).eq("id", args.id).execute()
+    print(f"✓ Removed. {len(urls)} reel(s) remain.")
 
 
 def cmd_list(args):
@@ -279,6 +311,14 @@ def main():
     p.add_argument("--photo")
     p.add_argument("--display-name")
 
+    p = sub.add_parser("add-reel", help="attach an Instagram reel/post URL to an instructor's page")
+    p.add_argument("id", type=int)
+    p.add_argument("url")
+
+    p = sub.add_parser("remove-reel", help="detach a reel URL from an instructor")
+    p.add_argument("id", type=int)
+    p.add_argument("url")
+
     p = sub.add_parser("list", help="list instructors with rules and handles")
     p.add_argument("filter", nargs="?")
 
@@ -290,6 +330,8 @@ def main():
         "unassign": cmd_unassign,
         "merge": cmd_merge,
         "set": cmd_set,
+        "add-reel": cmd_add_reel,
+        "remove-reel": cmd_remove_reel,
         "list": cmd_list,
     }[args.cmd](args)
 

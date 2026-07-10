@@ -1,76 +1,15 @@
 import { getAppData } from '@/lib/data';
-import { joinNames } from '@/lib/seo';
+import { joinNames, buildEventJsonLd } from '@/lib/seo';
 import DanceApp from '@/components/DanceApp';
 
 // ISR: allow cache to stay fresh up to 24 hours.
 // Vercel/Next.js will revalidate on the next request after 86400 s.
 export const revalidate = 86400;
 
-// ── JSON-LD helpers ────────────────────────────────────────────
-
-function timeRangeTo24h(timeRange) {
-  const m = timeRange.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-  if (!m) return null;
-  let h = parseInt(m[1], 10), min = parseInt(m[2], 10);
-  const ap = m[3].toUpperCase();
-  if (ap === 'PM' && h !== 12) h += 12;
-  if (ap === 'AM' && h === 12) h = 0;
-  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:00`;
-}
+// ── JSON-LD ──────────────────────────────────────────────────────
 
 function buildJsonLd(classes, studios) {
-  const now    = new Date();
-  const cutoff = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // next 14 days
-
-  const events = classes
-    .filter(c => {
-      const [y, mo, d] = c.date.split('-').map(Number);
-      const classDate  = new Date(y, mo - 1, d);
-      return classDate >= now && classDate <= cutoff;
-    })
-    .slice(0, 200)
-    .map(c => {
-      const studio    = studios.find(s => s.id === c.studioId);
-      const time24    = c.time_range ? timeRangeTo24h(c.time_range) : null;
-      const startDate = c.date + (time24 ? `T${time24}+08:00` : '');
-      const studioLabel = studio?.branch
-        ? `${studio.name} ${studio.branch}`
-        : studio?.name || c.studioId;
-
-      return {
-        '@type':               'Event',
-        name:                  c.name,
-        startDate,
-        location: {
-          '@type':   'Place',
-          name:      studioLabel,
-          address: {
-            '@type':           'PostalAddress',
-            addressLocality:   'Metro Manila',
-            addressRegion:     'NCR',
-            addressCountry:    'PH',
-            streetAddress:     studio?.address || undefined,
-          },
-        },
-        organizer: {
-          '@type': 'Organization',
-          name:    studioLabel,
-          url:     studio?.website || undefined,
-        },
-        ...(c.instructor ? {
-          performer: { '@type': 'Person', name: c.instructor },
-        } : {}),
-        description: [
-          `${c.name} dance class`,
-          c.instructor ? `with ${c.instructor}` : null,
-          `at ${studioLabel} in Metro Manila, Philippines.`,
-          c.time_range ? `Time: ${c.time_range} PHT.` : null,
-          c.genre ? `Style: ${c.genre}.` : null,
-        ].filter(Boolean).join(' '),
-        eventStatus:         'https://schema.org/EventScheduled',
-        eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-      };
-    });
+  const events = buildEventJsonLd(classes, studios, { days: 14 });
 
   const studioOrgs = studios.map(s => ({
     '@type':       'DanceGroup',
