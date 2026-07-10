@@ -1,4 +1,5 @@
 import { getAppData } from '@/lib/data';
+import { joinNames } from '@/lib/seo';
 import DanceApp from '@/components/DanceApp';
 
 // ISR: allow cache to stay fresh up to 24 hours.
@@ -85,6 +86,9 @@ function buildJsonLd(classes, studios) {
     ...(s.instagram ? { sameAs: [s.instagram] } : {}),
   }));
 
+  const studioNames = [...new Set(studios.map(s => s.name))].sort();
+  const studioList  = joinNames(studioNames) || 'studios across Metro Manila';
+
   const faq = {
     '@type': 'FAQPage',
     mainEntity: [
@@ -93,7 +97,7 @@ function buildJsonLd(classes, studios) {
         name:    'What dance classes are available in Metro Manila?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text:    "sa'nsayaw lists open dance classes from Zero Studio (QC and Mandaluyong), The Playground Studios (San Juan), Nude Floor, and 808 Studio (BGC and Podium). Styles include hip hop, K-pop cover, heels, femme, open choreography, dancehall, breaking, jazz funk, and more.",
+          text:    `sa'nsayaw lists open dance classes from ${studioList}. Styles include hip hop, K-pop cover, heels, femme, open choreography, dancehall, breaking, jazz funk, and more.`,
         },
       },
       {
@@ -101,7 +105,7 @@ function buildJsonLd(classes, studios) {
         name:    'Which dance studios in Manila have open classes?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text:    'Studios with open drop-in dance classes in Metro Manila include Zero Studio in Quezon City and Mandaluyong, The Playground Studios in San Juan, Nude Floor, and 808 Studio in BGC (Bonifacio Global City) and The Podium in Ortigas.',
+          text:    `Studios with open drop-in dance classes tracked by sa'nsayaw include ${studioList}, across Quezon City, Mandaluyong, San Juan, Makati, and Taguig.`,
         },
       },
       {
@@ -117,7 +121,7 @@ function buildJsonLd(classes, studios) {
         name:    'Are there beginner dance classes in Manila?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text:    'Yes. Zero Studio, The Playground Studios, and 808 Studio all regularly offer beginner and beginner-intermediate level classes in styles like hip hop, K-pop, heels, and femme.',
+          text:    `Yes. Most studios on sa'nsayaw, including ${studioList}, regularly offer beginner and beginner-intermediate level classes in styles like hip hop, K-pop, heels, and femme.`,
         },
       },
     ],
@@ -130,7 +134,7 @@ function buildJsonLd(classes, studios) {
         '@type':       'WebSite',
         name:          "sa'nsayaw",
         url:           'https://sansayaw.org',
-        description:   'Metro Manila dance class schedule aggregator. Find open classes at Zero Studio, The Playground Studios, Nude Floor, and 808 Studio. Updated daily.',
+        description:   `Metro Manila dance class schedule aggregator. Find open classes at ${studioList}. Updated daily.`,
         potentialAction: {
           '@type':       'SearchAction',
           target:        'https://www.sansayaw.org/?q={search_term_string}',

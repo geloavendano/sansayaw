@@ -1,5 +1,7 @@
 import { Geist, Geist_Mono } from 'next/font/google';
 import { GoogleAnalytics } from '@next/third-parties/google';
+import { getAppData } from '@/lib/data';
+import { joinNames } from '@/lib/seo';
 import './globals.css';
 
 const geist = Geist({
@@ -14,31 +16,50 @@ const geistMono = Geist_Mono({
   display: 'swap',
 });
 
-export const metadata = {
-  title: "sa'nsayaw · Manila Dance Classes, Studios & Schedules",
-  description:
-    'Find open dance classes in Metro Manila. Zero Studio, The Playground Studios, Nude Floor & 808 Studio — hip hop, K-pop, heels, dancehall. Updated daily.',
-  keywords:
-    'dance classes Manila, Manila dance studios, Metro Manila dance class schedule, Zero Studio schedule, Playground Studios classes, Nude Floor Manila, 808 Studio BGC, 808 Studio Podium, hip hop dance Manila, K-pop dance class Manila, heels class Manila, open choreography Manila, dancehall Manila, dance class today Philippines',
-  metadataBase: new URL('https://sansayaw.org'),
-  openGraph: {
-    type: 'website',
-    siteName: "sa'nsayaw",
-    title: "sa'nsayaw · Manila Dance Classes, Studios & Schedules",
-    description:
-      'One place to find every open dance class in Metro Manila. Schedules from Zero Studio, The Playground Studios, Nude Floor & 808 Studio — updated daily.',
-    url: 'https://sansayaw.org',
-  },
-  twitter: {
-    card: 'summary',
-    title: "sa'nsayaw · Manila Dance Classes, Studios & Schedules",
-    description:
-      'Find open dance classes in Metro Manila. Zero Studio, Playground Studios, Nude Floor & 808 Studio — hip hop, K-pop, heels, dancehall. Updated daily.',
-  },
-  alternates: {
-    canonical: 'https://sansayaw.org',
-  },
-};
+const TITLE = "sa'nsayaw · Manila Dance Classes, Studios & Schedules";
+
+// Metadata is generated (not static) so the studio list in the description
+// and keywords stays accurate as studios are added — it reads the same
+// cached data.js query the homepage uses, so this costs nothing extra.
+export async function generateMetadata() {
+  const { studios } = await getAppData();
+  const names = [...new Set(studios.map(s => s.name))].sort();
+  const studioList = joinNames(names) || 'Metro Manila dance studios';
+
+  const description =
+    `Find open dance classes in Metro Manila. ${studioList} — hip hop, ` +
+    `K-pop, heels, dancehall, and more. Updated daily.`;
+
+  const keywords = [
+    'dance classes Manila', 'Manila dance studios', 'Metro Manila dance class schedule',
+    'hip hop dance Manila', 'K-pop dance class Manila', 'heels class Manila',
+    'open choreography Manila', 'dancehall Manila', 'dance class today Philippines',
+    ...names.map(n => `${n} schedule`),
+    ...names.map(n => `${n} classes`),
+  ].join(', ');
+
+  return {
+    title: TITLE,
+    description,
+    keywords,
+    metadataBase: new URL('https://sansayaw.org'),
+    openGraph: {
+      type: 'website',
+      siteName: "sa'nsayaw",
+      title: TITLE,
+      description,
+      url: 'https://sansayaw.org',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: TITLE,
+      description,
+    },
+    alternates: {
+      canonical: 'https://sansayaw.org',
+    },
+  };
+}
 
 export const viewport = {
   themeColor: '#0a1820',
