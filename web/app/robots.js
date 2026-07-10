@@ -4,6 +4,6 @@ export default function robots() {
       userAgent: '*',
       allow: '/',
     },
-    sitemap: 'https://sansayaw.org/sitemap.xml',
+    sitemap: 'https://www.sansayaw.org/sitemap.xml',
   };
 }

@@ -133,7 +133,7 @@ function buildJsonLd(classes, studios) {
       {
         '@type':       'WebSite',
         name:          "sa'nsayaw",
-        url:           'https://sansayaw.org',
+        url:           'https://www.sansayaw.org',
         description:   `Metro Manila dance class schedule aggregator. Find open classes at ${studioList}. Updated daily.`,
         potentialAction: {
           '@type':       'SearchAction',

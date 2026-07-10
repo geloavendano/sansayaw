@@ -1,7 +1,7 @@
 export default function sitemap() {
   return [
     {
-      url: 'https://sansayaw.org',
+      url: 'https://www.sansayaw.org',
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 1,

@@ -42,13 +42,13 @@ export async function generateMetadata() {
     title: TITLE,
     description,
     keywords,
-    metadataBase: new URL('https://sansayaw.org'),
+    metadataBase: new URL('https://www.sansayaw.org'),
     openGraph: {
       type: 'website',
       siteName: "sa'nsayaw",
       title: TITLE,
       description,
-      url: 'https://sansayaw.org',
+      url: 'https://www.sansayaw.org',
     },
     twitter: {
       card: 'summary_large_image',
@@ -56,7 +56,7 @@ export async function generateMetadata() {
       description,
     },
     alternates: {
-      canonical: 'https://sansayaw.org',
+      canonical: 'https://www.sansayaw.org',
     },
   };
 }
