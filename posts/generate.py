@@ -10,6 +10,7 @@ Usage:
     python posts/generate.py --tag                      # list genres with classes this week
     python posts/generate.py --tag "K-POP"               # every K-POP class this week, all studios
     python posts/generate.py --tag "K-POP" "Heels"
+    python posts/generate.py --search "Unrvld"           # substring match on name/genre/venue
 
 Input format:
     {
@@ -267,6 +268,50 @@ def _fetch_by_tag(tags, week_label):
     return cards
 
 
+def _fetch_by_search(terms, week_label):
+    """
+    Build one card per free-text search term — every class this week whose
+    name, genre, or venue contains that text (case-insensitive substring),
+    across every studio. For recurring series/collab names that don't live
+    cleanly in the genre field (e.g. "Unrvld"), unlike --tag's exact match.
+    """
+    s = _connect_db()
+    rows = _week_rows(s)
+    studios = {r["id"]: r for r in s.table("studios").select("id, name, branch").execute().data}
+
+    cards = []
+    for term in terms:
+        needle = term.strip().lower()
+        matches = [
+            r for r in rows
+            if needle in (r.get("class_name") or "").lower()
+            or needle in (r.get("genre") or "").lower()
+            or needle in (r.get("venue") or "").lower()
+        ]
+        if not matches:
+            print(f"  WARNING: no classes matching '{term}' this week — skipping")
+            continue
+
+        cls = sorted(matches, key=lambda r: (r["date"], _start_minutes(r["time_range"])))
+        classes = [{
+            "day": date.fromisoformat(r["date"]).strftime("%a"),
+            "time": _row_start(r),
+            "name": r["class_name"],
+            "location": _row_location(studios, r),
+            "instructor": r.get("instructor"),
+        } for r in cls]
+
+        n = len(classes)
+        cards.append({
+            "name": term,
+            "handle": "",
+            "bio": f"{n} class{'es' if n != 1 else ''} this week across Metro Manila",
+            "photo": None,
+            "classes": classes,
+        })
+    return cards
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Generate sansayaw Instagram schedule posts")
     parser.add_argument("input", nargs="?", help="input JSON file (default: posts/input.json)")
@@ -274,13 +319,22 @@ async def main():
                         help="pull this week's classes from Supabase; no names = list available instructors")
     parser.add_argument("--tag", nargs="*", metavar="GENRE", default=None,
                         help="post of every class this week tagged with this genre, across all studios; no tags = list available genres")
+    parser.add_argument("--search", nargs="+", metavar="TERM", default=None,
+                        help="post of every class this week whose name/genre/venue contains this text, across all studios (substring match, e.g. a series name like \"Unrvld\")")
     parser.add_argument("--format", choices=["overlay", "portrait"], default=None,
                         help="output format (default: overlay, or the input file's setting)")
     args = parser.parse_args()
 
     monday, sunday = _week_bounds()
 
-    if args.tag is not None:
+    if args.search is not None:
+        week_label = _week_label(monday, sunday)
+        choreographers = _fetch_by_search(args.search, week_label)
+        default_format = args.format or "overlay"
+        input_dir = POSTS_DIR
+        if not choreographers:
+            sys.exit("Nothing to generate.")
+    elif args.tag is not None:
         week_label = _week_label(monday, sunday)
         choreographers = _fetch_by_tag(args.tag, week_label)
         default_format = args.format or "overlay"
