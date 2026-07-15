@@ -7,6 +7,9 @@ Usage:
     python posts/generate.py --from-db                  # list instructors with classes this week
     python posts/generate.py --from-db "Caila Santos"   # generate straight from Supabase
     python posts/generate.py --from-db "Caila Santos" "Rex Villanueva" --format portrait
+    python posts/generate.py --tag                      # list genres with classes this week
+    python posts/generate.py --tag "K-POP"               # every K-POP class this week, all studios
+    python posts/generate.py --tag "K-POP" "Heels"
 
 Input format:
     {
@@ -93,16 +96,16 @@ def _start_minutes(time_range):
     return h * 60 + int(m.group(2))
 
 
-def _fetch_from_db(names, week_label):
-    """Build choreographer dicts from the latest scrape run in Supabase."""
+def _connect_db():
     sys.path.insert(0, str(REPO_ROOT))
     from dotenv import load_dotenv
     load_dotenv(REPO_ROOT / ".env")
     from scrapers.db import get_client
+    return get_client().schema("sansayaw")
 
-    client = get_client()
-    s = client.schema("sansayaw")
 
+def _week_rows(s):
+    """All classes in the latest successful scrape run, within the current week."""
     run = (
         s.table("scrape_runs").select("id")
         .eq("status", "success").order("scraped_at", desc=True).limit(1)
@@ -113,12 +116,30 @@ def _fetch_from_db(names, week_label):
     run_id = run.data[0]["id"]
 
     monday, sunday = _week_bounds()
-    rows = (
+    return (
         s.table("classes").select("*")
         .eq("scrape_run_id", run_id)
         .gte("date", monday.isoformat()).lte("date", sunday.isoformat())
         .execute()
     ).data
+
+
+def _row_location(studios, r):
+    studio = studios.get(r["studio_id"], {})
+    location = studio.get("name", "")
+    if studio.get("branch"):
+        location += f" · {studio['branch']}"
+    return location
+
+
+def _row_start(r):
+    return re.split(r"\s*[–\-]\s*", r["time_range"] or "", maxsplit=1)[0].strip()
+
+
+def _fetch_from_db(names, week_label):
+    """Build choreographer dicts from the latest scrape run in Supabase."""
+    s = _connect_db()
+    rows = _week_rows(s)
 
     studios = {r["id"]: r for r in s.table("studios").select("id, name, branch").execute().data}
     instructors = {
@@ -167,19 +188,12 @@ def _fetch_from_db(names, week_label):
 
         for key in matches:
             cls = sorted(by_key[key], key=lambda r: (r["date"], _start_minutes(r["time_range"])))
-            classes = []
-            for r in cls:
-                studio = studios.get(r["studio_id"], {})
-                location = studio.get("name", "")
-                if studio.get("branch"):
-                    location += f" · {studio['branch']}"
-                start = re.split(r"\s*[–\-]\s*", r["time_range"] or "", maxsplit=1)[0].strip()
-                classes.append({
-                    "day": date.fromisoformat(r["date"]).strftime("%a"),
-                    "time": start,
-                    "name": r["class_name"],
-                    "location": location,
-                })
+            classes = [{
+                "day": date.fromisoformat(r["date"]).strftime("%a"),
+                "time": _row_start(r),
+                "name": r["class_name"],
+                "location": _row_location(studios, r),
+            } for r in cls]
 
             rec = instructors.get(key, {}) if isinstance(key, int) else {}
             handle = (rec.get("instagram") or "").strip()
@@ -201,18 +215,79 @@ def _fetch_from_db(names, week_label):
     return people
 
 
+def _fetch_by_tag(tags, week_label):
+    """
+    Build one card per genre tag — every matching class this week across
+    every studio, not scoped to a single instructor. Each row shows its
+    own instructor since the card itself isn't about one person.
+    """
+    s = _connect_db()
+    rows = _week_rows(s)
+    studios = {r["id"]: r for r in s.table("studios").select("id, name, branch").execute().data}
+
+    by_genre = {}
+    for r in rows:
+        g = (r.get("genre") or "").strip()
+        if g:
+            by_genre.setdefault(g, []).append(r)
+
+    # No tags given → list what's available and exit
+    if not tags:
+        print(f"Genres with classes this week ({week_label}):\n")
+        for g, cls in sorted(by_genre.items(), key=lambda kv: -len(kv[1])):
+            n = len(cls)
+            print(f"  {g}  ({n} class{'es' if n != 1 else ''})")
+        sys.exit(0)
+
+    cards = []
+    for tag in tags:
+        matches = [g for g in by_genre if g.lower() == tag.lower()]
+        if not matches:
+            print(f"  WARNING: no classes tagged '{tag}' this week — skipping")
+            continue
+
+        for genre in matches:
+            cls = sorted(by_genre[genre], key=lambda r: (r["date"], _start_minutes(r["time_range"])))
+            classes = [{
+                "day": date.fromisoformat(r["date"]).strftime("%a"),
+                "time": _row_start(r),
+                "name": r["class_name"],
+                "location": _row_location(studios, r),
+                "instructor": r.get("instructor"),
+            } for r in cls]
+
+            n = len(classes)
+            cards.append({
+                "name": genre,
+                "handle": "",
+                "bio": f"{n} class{'es' if n != 1 else ''} this week across Metro Manila",
+                "photo": None,
+                "classes": classes,
+            })
+    return cards
+
+
 async def main():
     parser = argparse.ArgumentParser(description="Generate sansayaw Instagram schedule posts")
     parser.add_argument("input", nargs="?", help="input JSON file (default: posts/input.json)")
     parser.add_argument("--from-db", nargs="*", metavar="NAME", default=None,
                         help="pull this week's classes from Supabase; no names = list available instructors")
+    parser.add_argument("--tag", nargs="*", metavar="GENRE", default=None,
+                        help="post of every class this week tagged with this genre, across all studios; no tags = list available genres")
     parser.add_argument("--format", choices=["overlay", "portrait"], default=None,
                         help="output format (default: overlay, or the input file's setting)")
     args = parser.parse_args()
 
     monday, sunday = _week_bounds()
 
-    if args.from_db is not None:
+    if args.tag is not None:
+        week_label = _week_label(monday, sunday)
+        choreographers = _fetch_by_tag(args.tag, week_label)
+        default_format = args.format or "overlay"
+        input_dir = POSTS_DIR
+        if not choreographers:
+            sys.exit("Nothing to generate.")
+    elif args.from_db is not None:
         week_label = _week_label(monday, sunday)
         choreographers = _fetch_from_db(args.from_db, week_label)
         default_format = args.format or "overlay"

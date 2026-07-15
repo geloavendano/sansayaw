@@ -165,7 +165,7 @@ function scheduleCard(data, maxClasses, dark) {
       </div>
       <div class="row-info">
         <div class="row-name">${esc(c.name)}</div>
-        <div class="row-loc">${PIN_ICON}<span>${esc(c.location)}</span></div>
+        <div class="row-loc">${PIN_ICON}<span>${esc(c.location)}${c.instructor ? " · " + esc(c.instructor) : ""}</span></div>
       </div>
     </div>`).join("");
 
