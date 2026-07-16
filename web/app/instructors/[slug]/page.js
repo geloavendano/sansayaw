@@ -56,8 +56,11 @@ export default async function InstructorPage({ params }) {
   const handle = igHandle(instructor.instagram);
   const reels = instructor.reel_urls || [];
 
+  // classes now includes past days (for the homepage/SEO); this page's
+  // schedule section is upcoming-only. PHT is UTC+8.
+  const todayIso = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
   const myClasses = classes
-    .filter(c => c.instructor_id === instructor.id)
+    .filter(c => c.instructor_id === instructor.id && c.date >= todayIso)
     .sort((a, b) => (a.date === b.date
       ? (a.parsedTime?.hour * 60 + a.parsedTime?.minute || 0) - (b.parsedTime?.hour * 60 + b.parsedTime?.minute || 0)
       : a.date < b.date ? -1 : 1));

@@ -947,28 +947,40 @@ function ibStyle() {
 // ─────────────────────────────────────────────────────────────
 function SearchTab({ isDesktop, query, setQuery, classes, studios, onOpenClass }) {
   const q = query.trim().toLowerCase();
+  const [includePast, setIncludePast] = useState(false);
+  const todayIso = isoOf(todayLocal());
 
   const results = useMemo(() => {
     if (!q) return [];
     return classes.filter(c => {
+      if (!includePast && c.date < todayIso) return false;
       const s = studios.find(x => x.id === c.studioId);
       return c.name.toLowerCase().includes(q)
           || (c.instructor || '').toLowerCase().includes(q)
           || (s && s.name.toLowerCase().includes(q))
           || (c.genre || '').toLowerCase().includes(q);
     }).sort((a, b) => {
-      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      if (a.date !== b.date) {
+        if (includePast) {
+          // With history in play, closest-to-today first beats plain
+          // chronological (which would surface 60-day-old classes on top)
+          const da = Math.abs(new Date(a.date) - new Date(todayIso));
+          const db = Math.abs(new Date(b.date) - new Date(todayIso));
+          if (da !== db) return da - db;
+        }
+        return a.date < b.date ? -1 : 1;
+      }
       const at = a.parsedTime ? a.parsedTime.hour * 60 + a.parsedTime.minute : 0;
       const bt = b.parsedTime ? b.parsedTime.hour * 60 + b.parsedTime.minute : 0;
       return at - bt;
     }).slice(0, 30);
-  }, [q, classes, studios]);
+  }, [q, classes, studios, includePast, todayIso]);
 
   const studioCounts = useMemo(() => {
     const ct = {};
-    classes.forEach(c => { ct[c.studioId] = (ct[c.studioId]||0)+1; });
+    classes.forEach(c => { if (c.date >= todayIso) ct[c.studioId] = (ct[c.studioId]||0)+1; });
     return ct;
-  }, [classes]);
+  }, [classes, todayIso]);
 
   const suggestions = ['Hip-Hop','K-Pop','Heels','Zero Studio','Playground','Nude Floor'];
 
@@ -1003,6 +1015,24 @@ function SearchTab({ isDesktop, query, setQuery, classes, studios, onOpenClass }
             </button>
           )}
         </div>
+        {q && (
+          <button onClick={() => setIncludePast(p => !p)} style={{
+            marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 7,
+            background: includePast ? T.accentSoft : 'transparent',
+            border: '1px solid ' + (includePast ? T.accent : T.borderStrong),
+            color: includePast ? T.accent : T.textDim,
+            borderRadius: T.pill, padding: '6px 12px',
+            fontFamily: T.bodyFont, fontSize: 12, fontWeight: 500, cursor: 'pointer',
+          }}>
+            <span style={{
+              width: 14, height: 14, borderRadius: 4, display: 'inline-flex',
+              alignItems: 'center', justifyContent: 'center',
+              border: '1.5px solid ' + (includePast ? T.accent : T.borderStrong),
+              background: includePast ? T.accent : 'transparent', color: T.accentOn,
+            }}>{includePast && <Icon.check s={10}/>}</span>
+            Include past classes
+          </button>
+        )}
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '4px 16px 110px' }}>
@@ -1533,6 +1563,12 @@ function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }) {
               </>
             );
           })()}
+
+          {c.last_updated && (
+            <div style={{ marginTop: 20, fontSize: 11, color: T.textMute, textAlign: 'center' }}>
+              Schedule last updated {formatLastUpdated(c.last_updated)}
+            </div>
+          )}
         </div>
       </div>
       </div>{/* end drag wrapper */}

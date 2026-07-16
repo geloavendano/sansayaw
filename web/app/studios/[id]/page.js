@@ -44,8 +44,11 @@ export default async function StudioPage({ params }) {
   const studio = studios.find(s => s.id === id);
   if (!studio) notFound();
 
+  // classes now includes past days (for the homepage/SEO); this page's
+  // schedule section is upcoming-only. PHT is UTC+8.
+  const todayIso = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 10);
   const studioClasses = classes
-    .filter(c => c.studioId === studio.id)
+    .filter(c => c.studioId === studio.id && c.date >= todayIso)
     .sort((a, b) => (a.date === b.date
       ? (a.parsedTime?.hour * 60 + a.parsedTime?.minute || 0) - (b.parsedTime?.hour * 60 + b.parsedTime?.minute || 0)
       : a.date < b.date ? -1 : 1));
