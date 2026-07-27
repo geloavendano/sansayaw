@@ -1,72 +1,43 @@
-import os
+"""
+Elfsight Events Calendar scraper.
+
+These studios run Shopify storefronts with an Elfsight events widget. We used
+to load the storefront in Playwright and parse the widget's rendered text, but
+Shopify rate-limits datacenter IPs — from 2026-07-17 every GitHub Actions run
+got a page whose entire body was "local_rate_limited", so all four studios
+silently returned nothing.
+
+Instead we call the same JSONP endpoint the widget itself boots from:
+
+    https://shy.elfsight.com/p/boot/?callback=X&shop=<store>.myshopify.com&w=<widget-id>
+
+That's Elfsight's own host, so Shopify's rate limiting doesn't apply, and no
+browser is needed. It also returns exact epoch-millisecond timestamps, which
+removed a longstanding hack: the rendered widget localised times to the
+visitor's IP, so times had to be shifted +8h when running on CI.
+
+Two title layouts, per `stacked_title`:
+    ZERØ / Playground — name is "INSTRUCTOR: CLASS", eventType is the genre
+    SPAC3            — name is the instructor, eventType is the class,
+                       tags[0] is the level
+"""
+
+import json
 import re
-from datetime import datetime
+import urllib.request
+from datetime import datetime, timedelta, timezone
 
-# ── Timezone correction ───────────────────────────────────────────────────────
-# Elfsight uses IP-geolocation for timezone detection, not the browser JS clock.
-# GitHub Actions IPs resolve to UTC, so scraped times are always UTC regardless
-# of browser flags. We detect CI explicitly rather than inferring from the
-# system timezone (which can be unreliable depending on environment variables).
-#
-# Proof: run #4 (bare Playwright, no special flags) and run #10 (with user-agent
-# + viewport) both stored times like "05:00 AM – 06:30 AM" for classes that
-# Manila dance studios schedule in the afternoon/evening — consistently UTC.
+PHT = timezone(timedelta(hours=8))
 
-_PHT_OFFSET_H = 8
-
-
-def _pht_correction():
-    """
-    Return hours to add to convert Elfsight UTC times to PHT.
-    GITHUB_ACTIONS=true is always set by GitHub-hosted runners → +8h.
-    Assumed PHT (UTC+8) locally → 0h.
-    """
-    if os.getenv("GITHUB_ACTIONS") == "true":
-        return _PHT_OFFSET_H
-    return 0
-
-
-def _shift_time_range(time_str, hours):
-    """
-    Shift every clock component in a range string by `hours`.
-    '11:00 AM – 12:30 PM' + 8 → '7:00 PM – 8:30 PM'
-    Returns the string unchanged when hours == 0.
-    """
-    if not time_str or hours == 0:
-        return time_str
-
-    def _shift_one(t, h):
-        m = re.match(r'(\d{1,2}):(\d{2})\s*(AM|PM)', t.strip(), re.IGNORECASE)
-        if not m:
-            return t
-        hr, mn = int(m.group(1)), int(m.group(2))
-        ap = m.group(3).upper()
-        if ap == 'PM' and hr != 12:
-            hr += 12
-        if ap == 'AM' and hr == 12:
-            hr = 0
-        hr = (hr + h) % 24
-        new_ap = 'PM' if hr >= 12 else 'AM'
-        new_hr = hr % 12 or 12
-        return f"{new_hr}:{mn:02d} {new_ap}"
-
-    parts = re.split(r'\s*[–\-]\s*', time_str, maxsplit=1)
-    return ' – '.join(_shift_one(p, hours) for p in parts)
-
-
-MONTHS = {
-    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
-    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
-    "JANUARY": 1, "FEBRUARY": 2, "MARCH": 3, "APRIL": 4, "JUNE": 6,
-    "JULY": 7, "AUGUST": 8, "SEPTEMBER": 9, "OCTOBER": 10,
-    "NOVEMBER": 11, "DECEMBER": 12,
-}
-
-REGISTER_RE = re.compile(
-    r"^(PRE-REGISTER|REGISTER NOW|REGISTER HERE|BUY TICKETS|REGISTER)$",
-    re.IGNORECASE,
+_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/124.0.0.0 Safari/537.36"
 )
-TIME_RE = re.compile(r"^\d{1,2}:\d{2}\s*[AP]M\s*[-–]\s*\d{1,2}:\d{2}\s*[AP]M$")
+
+# Only publish classes from today onward; the horizon guards against a studio
+# posting a far-future one-off and dragging the whole payload along with it.
+_HORIZON_DAYS = 120
 
 SITES = [
     {
@@ -78,6 +49,8 @@ SITES = [
         "website": "https://zerostudioph.com",
         "instagram": "https://www.instagram.com/zerostudioph",
         "photo_url": None,
+        "shop": "zero-studio-e8d1.myshopify.com",
+        "widget_id": "74b6be01-e8ce-45a4-970c-3b0346f91895",
     },
     {
         "id": "zero_studio_mandaluyong",
@@ -88,6 +61,8 @@ SITES = [
         "website": "https://zerostudioph.com",
         "instagram": "https://www.instagram.com/zerostudioph",
         "photo_url": None,
+        "shop": "zero-studio-e8d1.myshopify.com",
+        "widget_id": "900fb78e-a7e9-4585-8c3d-a95389e48e19",
     },
     {
         "id": "playground",
@@ -98,6 +73,8 @@ SITES = [
         "website": "https://theplaygroundstudiosph.com",
         "instagram": "https://www.instagram.com/theplayground.studios.ph",
         "photo_url": None,
+        "shop": "idntzf-3a.myshopify.com",
+        "widget_id": "8244257e-1f96-4cd4-b082-84863f34cbcd",
     },
     {
         "id": "spac3",
@@ -109,8 +86,10 @@ SITES = [
         "instagram": "https://www.instagram.com/spac3_ph",
         "maps_url": "https://maps.app.goo.gl/ZfewEFxPdZwwqNWL9",
         "photo_url": None,
-        # Cards stack "CLASS STYLE / INSTRUCTOR / LEVEL" on separate lines
-        # instead of the "INSTRUCTOR: CLASS" title format
+        "shop": "fpjcvt-1e.myshopify.com",
+        "widget_id": "54bcef57-c43e-4be9-90e8-4faeed9eeb05",
+        # Cards stack "CLASS STYLE / INSTRUCTOR / LEVEL" instead of using the
+        # "INSTRUCTOR: CLASS" title format
         "stacked_title": True,
     },
 ]
@@ -124,175 +103,106 @@ def _split_instructor(title):
     return None, title
 
 
-def parse_text(raw_text, tz_correction=None, stacked_title=False):
-    """
-    Parse Elfsight Events Calendar rendered text into a list of class dicts.
+def _fmt_time(dt):
+    """datetime → '7:00 PM'"""
+    return f"{dt.hour % 12 or 12}:{dt.minute:02d} {'PM' if dt.hour >= 12 else 'AM'}"
 
-    Each event block in the rendered text looks like:
-        MONTH
-        DAY
-        [GENRE]           ← optional, no colon
-        INSTRUCTOR: CLASS
-        HH:MM AM - HH:MM PM
-        [VENUE]           ← optional
-        REGISTER ...      ← button text, marks end of block
 
-    With stacked_title=True (SPAC3), the lines before the time are instead:
-        CLASS STYLE       ← e.g. "Basic Femme", "Open Choreography"
-        INSTRUCTOR        ← e.g. "ZEN"
-        LEVEL             ← e.g. "BEGINNERS" (becomes the genre)
+def _option_names(entries):
     """
-    if tz_correction is None:
-        tz_correction = _pht_correction()
-        print(f"    [tz] Elfsight correction: +{tz_correction}h (GITHUB_ACTIONS={os.getenv('GITHUB_ACTIONS')!r})")
-    lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
+    Elfsight stores dropdown options as a list mixing real options
+    ({'value': <uuid>, 'name': ...}) with a schema descriptor object.
+    Keep only the real options.
+    """
+    out = {}
+    for e in entries or []:
+        if isinstance(e, dict) and e.get("value"):
+            out[e["value"]] = e.get("name")
+    return out
+
+
+def fetch_settings(site, timeout=30):
+    """Fetch and unwrap the widget's JSONP boot payload."""
+    url = (
+        "https://shy.elfsight.com/p/boot/"
+        f"?callback=cb&shop={site['shop']}&w={site['widget_id']}"
+    )
+    req = urllib.request.Request(
+        url, headers={"User-Agent": _UA, "Referer": site["website"] + "/"}
+    )
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        raw = resp.read().decode("utf-8")
+
+    # Body is `/**/cb({...});` — strip the JSONP wrapper
+    body = re.sub(r"^\s*/\*\*/\s*\w+\(", "", raw).rstrip().rstrip(";").rstrip(")")
+    payload = json.loads(body)
+
+    widget = payload["data"]["widgets"][site["widget_id"]]
+    return widget["data"]["settings"]
+
+
+def parse_settings(settings, site, today=None):
+    """Turn a widget payload into class dicts (today → +_HORIZON_DAYS, PHT)."""
+    stacked = site.get("stacked_title", False)
+    locations = _option_names(settings.get("locations"))
+    event_types = _option_names(settings.get("eventTypes"))
+
+    today = today or datetime.now(PHT).date()
+    horizon = today + timedelta(days=_HORIZON_DAYS)
+
     classes = []
-    today = datetime.now()
-    i = 0
-
-    while i < len(lines):
-        line = lines[i]
-
-        # Detect month header
-        if line.upper() not in MONTHS:
-            i += 1
+    for e in settings.get("events", []):
+        start_ms = e.get("start")
+        if not start_ms:
+            continue
+        start = datetime.fromtimestamp(start_ms / 1000, PHT)
+        if not (today <= start.date() <= horizon):
             continue
 
-        month_num = MONTHS[line.upper()]
+        time_str = _fmt_time(start)
+        if e.get("end"):
+            time_str += " – " + _fmt_time(datetime.fromtimestamp(e["end"] / 1000, PHT))
 
-        # Next line must be a day number
-        if i + 1 >= len(lines) or not lines[i + 1].isdigit():
-            i += 1
-            continue
+        title = (e.get("name") or "").strip()
+        type_name = event_types.get(e.get("eventType"))
+        tags = [t for t in (e.get("tags") or []) if t]
 
-        day_num = int(lines[i + 1])
-        if not (1 <= day_num <= 31):
-            i += 1
-            continue
-
-        # Year: assume current year; roll over if month already passed
-        year = today.year
-        if month_num < today.month - 1:
-            year = today.year + 1
-
-        date_str = f"{year}-{month_num:02d}-{day_num:02d}"
-        i += 2  # skip month + day lines
-
-        # Collect lines for this event until next month marker or end
-        event_lines = []
-        while i < len(lines):
-            l = lines[i]
-            if l.upper() in MONTHS:
-                break
-            if REGISTER_RE.match(l):
-                i += 1  # consume the register button
-                break
-            event_lines.append(l)
-            i += 1
-
-        # Find time line as anchor
-        time_str = None
-        time_idx = None
-        for k, el in enumerate(event_lines):
-            if TIME_RE.match(el):
-                time_str = el
-                time_idx = k
-                break
-
-        if time_str is None:
-            continue
-
-        before = event_lines[:time_idx]
-        after = event_lines[time_idx + 1:]
-
-        # Lines before time: last line is the title, earlier lines are genre
-        if not before:
-            continue
-
-        # Optional venue: first line after time if it's not a register button
-        venue = None
-        if after and not REGISTER_RE.match(after[0]):
-            venue = after[0]
-
-        if stacked_title and len(before) >= 2:
-            level = before[-1]
-            instructor = before[-2]
-            style_parts = before[:-2]
-            class_name = " / ".join(style_parts) if style_parts else level
-            genre = level if style_parts else None
+        if stacked:
+            instructor = title or None
+            class_name = type_name or title
+            genre = tags[0] if tags else None
         else:
-            title_raw = before[-1]
-            genre = " / ".join(before[:-1]) if len(before) > 1 else None
-            instructor, class_name = _split_instructor(title_raw)
+            instructor, class_name = _split_instructor(title)
+            genre = type_name or (tags[0] if tags else None)
 
         classes.append({
-            "date": date_str,
+            "date": start.date().isoformat(),
             "instructor": instructor,
             "class_name": class_name,
             "genre": genre,
-            "time": _shift_time_range(time_str, tz_correction),
-            "venue": venue,
+            "time": time_str,
+            "venue": locations.get(e.get("location")),
+            "media": e.get("media") or None,
         })
 
+    classes.sort(key=lambda c: (c["date"], c["time"]))
     return classes
 
 
-async def scrape(page, site):
-    """Scrape one Elfsight-powered site. Returns studio dict with classes list."""
+def scrape(site):
+    """Scrape one Elfsight-powered site. Returns a studio dict with classes."""
     print(f"  Fetching {site['name']} ({site.get('branch') or 'main'})...")
-    await page.goto(site["url"], wait_until="domcontentloaded")
-
-    # Wait for the Elfsight events widget to populate
-    try:
-        await page.wait_for_selector(".eapps-events-calendar-events-item", timeout=20000)
-    except Exception:
-        # Fall back: wait for any Elfsight container, then pause briefly
-        try:
-            await page.wait_for_selector(".eapps-events-calendar", timeout=10000)
-        except Exception:
-            pass
-        await page.wait_for_timeout(4000)
-
-    # Read the widget text. <main> is the normal container, but a bot-challenge
-    # or error page won't have one — waiting on it would burn the full 30s
-    # default timeout and then fail, so try it briefly and fall back to <body>.
-    raw_text = ""
-    for selector in ("main", "body"):
-        try:
-            raw_text = await page.locator(selector).first.inner_text(timeout=5000)
-            if raw_text.strip():
-                break
-        except Exception:
-            continue
-
-    classes = parse_text(raw_text, stacked_title=site.get("stacked_title", False))
+    settings = fetch_settings(site)
+    classes = parse_settings(settings, site)
     print(f"    → {len(classes)} classes found")
 
-    if not classes:
-        # Nothing parsed — dump what the page actually was so the cause is
-        # visible in CI logs (bot challenge / redirect / empty render).
-        try:
-            title = await page.title()
-        except Exception:
-            title = "?"
-        snippet = " ".join(raw_text.split())[:200]
-        print(f"    [diag] url={page.url}")
-        print(f"    [diag] title={title!r} text_len={len(raw_text)}")
-        print(f"    [diag] text={snippet!r}")
-
-    # Extract instructor photos from Elfsight card images.
-    # Each card renders: <img class="eapp-events-calendar-media-image" alt="..." src="...">
-    # The alt is the card title — either "INSTRUCTOR: CLASS" or just the
-    # instructor's name — so split it the same way as class titles.
+    # Instructor photos ride along on each event, so no separate DOM pass.
     photo_map = {}
-    imgs = await page.locator("img.eapp-events-calendar-media-image").all()
-    for img in imgs:
-        alt = (await img.get_attribute("alt") or "").strip()
-        src = await img.get_attribute("src") or ""
-        name, _ = _split_instructor(alt)
-        name = name or alt
-        if name and src and name not in photo_map:
-            photo_map[name] = src
+    for c in classes:
+        media = c.pop("media", None)
+        instructor = c.get("instructor")
+        if media and instructor and instructor not in photo_map:
+            photo_map[instructor] = media
     if photo_map:
         print(f"    → {len(photo_map)} instructor photo(s) found")
 
@@ -307,11 +217,11 @@ async def scrape(page, site):
     }
 
 
-async def scrape_all(page):
+def scrape_all():
     results = []
     for site in SITES:
         try:
-            results.append(await scrape(page, site))
+            results.append(scrape(site))
         except Exception as e:
             print(f"    ERROR: {e}")
             results.append({
@@ -321,6 +231,7 @@ async def scrape_all(page):
                 "address": site["address"],
                 "source_url": site["url"],
                 "classes": [],
+                "instructor_photos": {},
                 "error": str(e),
             })
     return results

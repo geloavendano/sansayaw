@@ -100,19 +100,6 @@ async def main():
         )
         page = await context.new_page()
 
-        # ── Elfsight sites (ALL CAPS source) ──────────────────────────────
-        elfsight_results = await elfsight.scrape_all(page)
-        for studio_data in elfsight_results:
-            if studio_data.get("error"):
-                errors.append(f"{studio_data['id']}: {studio_data['error']}")
-            elif not studio_data["classes"]:
-                # These studios always have classes — an empty result means the
-                # page was blocked or the widget didn't render, not a quiet week.
-                # Treat it as an error so the run is marked partial instead of
-                # silently reporting success with missing studios.
-                errors.append(f"{studio_data['id']}: 0 classes parsed (blocked or widget did not render)")
-            all_rows += _build_class_rows(studio_data, {}, run_id, is_caps=True)
-
         # ── Nude Floor (already mixed-case source) ─────────────────────────
         try:
             nude_data = await nudefloor.scrape(page)
@@ -147,6 +134,19 @@ async def main():
             print(f"  Ember ERROR: {e}")
 
         await browser.close()
+
+    # ── Elfsight sites — widget JSON API, no browser (ALL CAPS source) ─────
+    elfsight_results = elfsight.scrape_all()
+    for studio_data in elfsight_results:
+        if studio_data.get("error"):
+            errors.append(f"{studio_data['id']}: {studio_data['error']}")
+        elif not studio_data["classes"]:
+            # These studios always have classes — an empty result means the
+            # fetch was blocked or the widget config changed, not a quiet week.
+            # Treat it as an error so the run is marked partial instead of
+            # silently reporting success with missing studios.
+            errors.append(f"{studio_data['id']}: 0 classes parsed (blocked or widget changed)")
+        all_rows += _build_class_rows(studio_data, {}, run_id, is_caps=True)
 
     # ── Kidlat — Rezerv API (no browser needed) ───────────────────────────
     kidlat_data = None
