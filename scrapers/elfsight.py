@@ -253,11 +253,32 @@ async def scrape(page, site):
             pass
         await page.wait_for_timeout(4000)
 
-    main = page.locator("main")
-    raw_text = await main.inner_text()
+    # Read the widget text. <main> is the normal container, but a bot-challenge
+    # or error page won't have one — waiting on it would burn the full 30s
+    # default timeout and then fail, so try it briefly and fall back to <body>.
+    raw_text = ""
+    for selector in ("main", "body"):
+        try:
+            raw_text = await page.locator(selector).first.inner_text(timeout=5000)
+            if raw_text.strip():
+                break
+        except Exception:
+            continue
 
     classes = parse_text(raw_text, stacked_title=site.get("stacked_title", False))
     print(f"    → {len(classes)} classes found")
+
+    if not classes:
+        # Nothing parsed — dump what the page actually was so the cause is
+        # visible in CI logs (bot challenge / redirect / empty render).
+        try:
+            title = await page.title()
+        except Exception:
+            title = "?"
+        snippet = " ".join(raw_text.split())[:200]
+        print(f"    [diag] url={page.url}")
+        print(f"    [diag] title={title!r} text_len={len(raw_text)}")
+        print(f"    [diag] text={snippet!r}")
 
     # Extract instructor photos from Elfsight card images.
     # Each card renders: <img class="eapp-events-calendar-media-image" alt="..." src="...">
