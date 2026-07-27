@@ -105,6 +105,12 @@ async def main():
         for studio_data in elfsight_results:
             if studio_data.get("error"):
                 errors.append(f"{studio_data['id']}: {studio_data['error']}")
+            elif not studio_data["classes"]:
+                # These studios always have classes — an empty result means the
+                # page was blocked or the widget didn't render, not a quiet week.
+                # Treat it as an error so the run is marked partial instead of
+                # silently reporting success with missing studios.
+                errors.append(f"{studio_data['id']}: 0 classes parsed (blocked or widget did not render)")
             all_rows += _build_class_rows(studio_data, {}, run_id, is_caps=True)
 
         # ── Nude Floor (already mixed-case source) ─────────────────────────
