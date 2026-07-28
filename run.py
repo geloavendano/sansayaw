@@ -79,16 +79,10 @@ async def main():
     errors = []
 
     async with async_playwright() as p:
+        # Only Nude Floor, TADS and Ember still need a browser — 808 and the
+        # Elfsight studios now read their widgets' JSON/HTML endpoints directly.
         browser = await p.chromium.launch(
-            args=[
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                # NOTE: do NOT add --disable-blink-features=AutomationControlled here.
-                # Elfsight checks navigator.webdriver and, when it looks like a real
-                # browser, converts times to the visitor's IP-detected timezone (UTC on
-                # GitHub Actions). When detected as automation it serves absolute PHT
-                # times from the widget config — which is what we want.
-            ]
+            args=["--no-sandbox", "--disable-dev-shm-usage"]
         )
         context = await browser.new_context(
             user_agent=(
@@ -107,13 +101,6 @@ async def main():
         except Exception as e:
             errors.append(f"nudefloor: {e}")
             print(f"  Nude Floor ERROR: {e}")
-
-        # ── 808 Studio — Mindbody (ALL CAPS source) ─────────────────────────
-        studio808_results = await studio808.scrape_all(page)
-        for studio_data in studio808_results:
-            if studio_data.get("error"):
-                errors.append(f"{studio_data['id']}: {studio_data['error']}")
-            all_rows += _build_class_rows(studio_data, {}, run_id, is_caps=True)
 
         # ── TADS — Wix Bookings (ALL CAPS class names, mixed-case instructors) ──
         tads_data = None
@@ -134,6 +121,13 @@ async def main():
             print(f"  Ember ERROR: {e}")
 
         await browser.close()
+
+    # ── 808 Studio — Mindbody widget API, no browser (ALL CAPS source) ─────
+    studio808_results = studio808.scrape_all()
+    for studio_data in studio808_results:
+        if studio_data.get("error"):
+            errors.append(f"{studio_data['id']}: {studio_data['error']}")
+        all_rows += _build_class_rows(studio_data, {}, run_id, is_caps=True)
 
     # ── Elfsight sites — widget JSON API, no browser (ALL CAPS source) ─────
     elfsight_results = elfsight.scrape_all()
