@@ -4,7 +4,7 @@ import urllib.request
 
 from playwright.async_api import async_playwright
 
-from scrapers import elfsight, nudefloor, studio808, tads, kidlat, ember
+from scrapers import elfsight, nudefloor, studio808, tads, kidlat, ember, firstblock
 from scrapers import normalize
 from scrapers.db import (
     seed_studios,
@@ -15,7 +15,10 @@ from scrapers.db import (
     insert_classes,
 )
 
-ALL_STUDIO_META = elfsight.SITES + [nudefloor.SITE] + studio808.SITES + [tads.SITE] + [kidlat.SITE] + [ember.SITE]
+ALL_STUDIO_META = (
+    elfsight.SITES + [nudefloor.SITE] + studio808.SITES + [tads.SITE]
+    + [kidlat.SITE] + [ember.SITE] + [firstblock.SITE]
+)
 
 
 def _revalidate_frontend():
@@ -151,6 +154,14 @@ async def main():
         errors.append(f"kidlat: {e}")
         print(f"  Kidlat ERROR: {e}")
 
+    # ── First Block Studios — Fillout form JSON (no browser needed) ────────
+    try:
+        firstblock_data = await firstblock.scrape()
+        all_rows += _build_class_rows(firstblock_data, {}, run_id, is_caps=False)
+    except Exception as e:
+        errors.append(f"firstblock: {e}")
+        print(f"  First Block Studios ERROR: {e}")
+
     # Resolve (instructor, studio) pairs to ids via confirmed alias rules
     all_pairs = list({(r["instructor"], r["studio_id"]) for r in all_rows if r["instructor"]})
     instructor_map = resolve_instructors(all_pairs)
@@ -177,7 +188,7 @@ async def main():
 
     # 808 Studio and TADS are best-effort; failures don't degrade the run.
     # Only mark partial if a core scraper (elfsight / nudefloor) errored.
-    core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc", "tads", "kidlat", "ember"))]
+    core_errors = [e for e in errors if not e.startswith(("808_podium", "808_bgc", "tads", "kidlat", "ember", "firstblock"))]
     status = "partial" if core_errors else "success"
     finish_scrape_run(run_id, status)
 
