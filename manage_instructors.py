@@ -33,17 +33,6 @@ def _base(name):
     return name.replace(" (Sub)", "").strip()
 
 
-def _latest_run_id(s):
-    run = (
-        s.table("scrape_runs").select("id")
-        .eq("status", "success").order("scraped_at", desc=True).limit(1)
-        .execute()
-    )
-    if not run.data:
-        sys.exit("No successful scrape run found.")
-    return run.data[0]["id"]
-
-
 def _fetch_instructors(s):
     return {
         r["id"]: r
@@ -70,20 +59,32 @@ def _studio_label(studios, studio_id):
 
 
 def _pending_pairs(s):
-    """Distinct (base name, studio_id) pairs in the latest run without a rule."""
-    run_id = _latest_run_id(s)
-    rows = (
-        s.table("classes").select("instructor, studio_id, class_name")
-        .eq("scrape_run_id", run_id).not_.is_("instructor", "null")
-        .execute()
-    ).data
-    ruled = {(a["name"], a["studio_id"]) for a in _fetch_aliases(s)}
+    """
+    Distinct (base name, studio_id) pairs with classes that have no rule
+    applied yet. instructor_id is NULL exactly when no rule has ever
+    matched that name+studio (assigning a rule backfills every matching
+    row, past and present — see _apply_rule), so this scans every class
+    ever scraped rather than a single run. Paginated since PostgREST caps
+    a single request at 1000 rows.
+    """
+    rows = []
+    start = 0
+    while True:
+        batch = (
+            s.table("classes").select("instructor, studio_id, class_name")
+            .not_.is_("instructor", "null").is_("instructor_id", "null")
+            .range(start, start + 999)
+            .execute()
+        ).data
+        rows.extend(batch)
+        if len(batch) < 1000:
+            break
+        start += 1000
 
     pending = {}
     for r in rows:
         key = (_base(r["instructor"]), r["studio_id"])
-        if key not in ruled:
-            pending.setdefault(key, []).append(r["class_name"])
+        pending.setdefault(key, []).append(r["class_name"])
     return pending
 
 
