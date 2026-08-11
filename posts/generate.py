@@ -106,20 +106,14 @@ def _connect_db():
 
 
 def _week_rows(s):
-    """All classes in the latest successful scrape run, within the current week."""
-    run = (
-        s.table("scrape_runs").select("id")
-        .eq("status", "success").order("scraped_at", desc=True).limit(1)
-        .execute()
-    )
-    if not run.data:
-        sys.exit("No successful scrape run found in the database.")
-    run_id = run.data[0]["id"]
-
+    """
+    This week's classes, served from classes_display — which picks each
+    (date, studio)'s latest covering run rather than one single run, so a
+    studio that failed in the most recent run doesn't vanish from the post.
+    """
     monday, sunday = _week_bounds()
     return (
-        s.table("classes").select("*")
-        .eq("scrape_run_id", run_id)
+        s.table("classes_display").select("*")
         .gte("date", monday.isoformat()).lte("date", sunday.isoformat())
         .execute()
     ).data
@@ -271,9 +265,11 @@ def _fetch_by_tag(tags, week_label):
 def _fetch_by_search(terms, week_label):
     """
     Build one card per free-text search term — every class this week whose
-    name, genre, or venue contains that text (case-insensitive substring),
-    across every studio. For recurring series/collab names that don't live
-    cleanly in the genre field (e.g. "Unrvld"), unlike --tag's exact match.
+    name, genre, venue, or instructor contains that text (case-insensitive
+    substring), across every studio. For recurring series/collab/crew names
+    that don't live cleanly in the genre field (e.g. "Unrvld", a crew name
+    tucked into the instructor field like "Alo Galedo (Brotherhood)"),
+    unlike --tag's exact match.
     """
     s = _connect_db()
     rows = _week_rows(s)
@@ -287,6 +283,7 @@ def _fetch_by_search(terms, week_label):
             if needle in (r.get("class_name") or "").lower()
             or needle in (r.get("genre") or "").lower()
             or needle in (r.get("venue") or "").lower()
+            or needle in (r.get("instructor") or "").lower()
         ]
         if not matches:
             print(f"  WARNING: no classes matching '{term}' this week — skipping")
