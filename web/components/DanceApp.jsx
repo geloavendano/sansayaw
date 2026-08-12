@@ -219,9 +219,12 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
 
   const dateCount = useMemo(() => {
     const c = {};
-    classes.forEach(cl => { c[cl.date] = (c[cl.date]||0)+1; });
+    classes.forEach(cl => {
+      if (!enabledStudios.has(cl.studioId)) return;
+      c[cl.date] = (c[cl.date]||0)+1;
+    });
     return c;
-  }, [classes]);
+  }, [classes, enabledStudios]);
 
   useEffect(() => {
     const h = e => {
