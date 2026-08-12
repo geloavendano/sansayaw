@@ -155,6 +155,7 @@ async def main():
         print(f"  Kidlat ERROR: {e}")
 
     # ── First Block Studios — Fillout form JSON (no browser needed) ────────
+    firstblock_data = None
     try:
         firstblock_data = await firstblock.scrape()
         all_rows += _build_class_rows(firstblock_data, {}, run_id, is_caps=False)
@@ -169,16 +170,21 @@ async def main():
     if unmatched:
         print(f"\n  {len(unmatched)} instructor/studio pair(s) unassigned — run: python3 manage_instructors.py review")
 
-    # Update instructor photos from Elfsight scrapers.
-    # Elfsight alt text is ALL CAPS — normalize with is_caps=True to match stored names.
-    elfsight_photos = {}
-    for data in elfsight_results:
+    # Update instructor photos from scrapers that carry them.
+    # Elfsight alt text is ALL CAPS — normalize with is_caps=True to match
+    # stored names; First Block's Fillout names are already mixed-case.
+    photo_sources = [(d, True) for d in elfsight_results]
+    if firstblock_data:
+        photo_sources.append((firstblock_data, False))
+
+    scraped_photos = {}
+    for data, is_caps in photo_sources:
         for raw_name, url in data.get("instructor_photos", {}).items():
-            norm = normalize.instructor(raw_name, is_caps=True)
+            norm = normalize.instructor(raw_name, is_caps=is_caps)
             instructor_id = instructor_map.get((norm, data["id"]))
-            if instructor_id and instructor_id not in elfsight_photos:
-                elfsight_photos[instructor_id] = url
-    update_instructor_photos(elfsight_photos)
+            if instructor_id and instructor_id not in scraped_photos:
+                scraped_photos[instructor_id] = url
+    update_instructor_photos(scraped_photos)
 
     for row in all_rows:
         if row["instructor"]:

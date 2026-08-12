@@ -151,8 +151,10 @@ def _parse_option(name, caption):
 
 
 def _extract_classes(form_json):
+    """Returns (classes, instructor_photos) — photos keyed by raw instructor name."""
     steps = form_json["pageProps"]["flowSnapshot"]["template"]["steps"]
     classes = []
+    photo_map = {}
 
     for step in steps.values():
         if _STEP_NAME not in (step.get("name") or "").lower():
@@ -189,7 +191,15 @@ def _extract_classes(form_json):
                     "genre":      parsed["genre"],
                 })
 
-    return classes
+                # The photo is the option's own image — only meaningful when
+                # the option names an instructor (see _parse_option), not
+                # when it names a class/offering like "Yoga".
+                instructor = parsed["instructor"]
+                image_url = (opt.get("imageUrl") or {}).get("logic", {}).get("value")
+                if instructor and image_url and instructor not in photo_map:
+                    photo_map[instructor] = image_url
+
+    return classes, photo_map
 
 
 async def scrape(page=None):
@@ -200,16 +210,23 @@ async def scrape(page=None):
     form_json = _fetch_form_json(build_id)
 
     today_str = _date.today().isoformat()
-    classes = [c for c in _extract_classes(form_json) if c["date"] >= today_str]
+    all_classes, photo_map = _extract_classes(form_json)
+    classes = [c for c in all_classes if c["date"] >= today_str]
     if not classes:
         raise Exception("no classes parsed — Fillout form structure may have changed")
 
+    scraped_names = {c["instructor"] for c in classes if c["instructor"]}
+    instructor_photos = {name: url for name, url in photo_map.items() if name in scraped_names}
+
     print(f"    → {len(classes)} total First Block Studios classes")
+    if instructor_photos:
+        print(f"    → {len(instructor_photos)} instructor photo(s) found")
     return {
-        "id":         SITE["id"],
-        "name":       SITE["name"],
-        "branch":     SITE.get("branch"),
-        "address":    SITE["address"],
-        "source_url": SITE["source_url"],
-        "classes":    classes,
+        "id":                 SITE["id"],
+        "name":               SITE["name"],
+        "branch":             SITE.get("branch"),
+        "address":            SITE["address"],
+        "source_url":         SITE["source_url"],
+        "classes":            classes,
+        "instructor_photos":  instructor_photos,
     }

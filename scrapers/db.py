@@ -84,10 +84,14 @@ def resolve_instructors(pairs):
     return {display: alias_map[base] for display, base in canonical.items() if base in alias_map}
 
 
+_SCRAPER_PHOTO_HOSTS = ("elfsight", "fillout")
+
+
 def update_instructor_photos(photos_by_id):
     """
-    Fill photo_url per instructor id from scraped Elfsight cards.
-    Manually curated photos (non-Elfsight URLs) are never overwritten.
+    Fill photo_url per instructor id from scraper-sourced photos (Elfsight
+    cards, First Block's Fillout form). Manually curated photos (any other
+    URL) are never overwritten.
     """
     if not photos_by_id:
         return
@@ -100,9 +104,10 @@ def update_instructor_photos(photos_by_id):
     for row in current.data:
         url = photos_by_id.get(row["id"])
         existing = row.get("photo_url") or ""
-        # Photos on elfsight domains (files.elfsight.com / files.elfsightcdn.com)
-        # are scraper-managed and refreshable; anything else was set manually.
-        if url and url != existing and (not existing or "elfsight" in existing):
+        # Photos on known scraper domains are refreshable; anything else
+        # (a manually-set URL) is left alone.
+        is_scraper_managed = not existing or any(host in existing for host in _SCRAPER_PHOTO_HOSTS)
+        if url and url != existing and is_scraper_managed:
             s.table("instructors").update({"photo_url": url}).eq("id", row["id"]).execute()
 
 
