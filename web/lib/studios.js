@@ -15,6 +15,7 @@ export const STUDIO_CITY = {
   '808_podium':             'Mandaluyong',
   '808_bgc':                'Taguig',
   ember:                    'San Juan',
+  firstblock:               'Quezon City',
   kidlat:                   'San Juan',
   nudefloor:                'Makati',
   spac3:                    'Quezon City',
