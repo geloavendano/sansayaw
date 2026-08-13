@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
+import NextLink from 'next/link';
 import { T } from '@/lib/theme';
 import { studioColor, studioLoc, studioName } from '@/lib/studios';
 
@@ -1262,6 +1263,15 @@ function ContactTab({ isDesktop, lastUpdated, studios }) {
               </div>
             </div>
           )}
+
+          <div style={{ marginTop: 18, display: 'flex', gap: 16 }}>
+            <NextLink href="/privacy" style={{ fontSize: 12, color: T.textDim, textDecoration: 'underline', textUnderlineOffset: 2 }}>
+              Privacy Policy
+            </NextLink>
+            <NextLink href="/support" style={{ fontSize: 12, color: T.textDim, textDecoration: 'underline', textUnderlineOffset: 2 }}>
+              Support
+            </NextLink>
+          </div>
 
           <div style={{ marginTop: 16, fontSize: 11, color: T.textMute }}>
             sa&apos;nsayaw · made in Manila · {new Date().getFullYear()}

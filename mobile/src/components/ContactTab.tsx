@@ -169,6 +169,17 @@ export function ContactTab({ lastUpdated, studios }: { lastUpdated: string | nul
             </div>
           )}
 
+          <div style={{ marginTop: 18, display: 'flex', gap: 16 }}>
+            <button onClick={() => openExternal('https://www.sansayaw.org/privacy')} style={{
+              background: 'transparent', border: 0, padding: 0, cursor: 'pointer',
+              fontSize: 12, color: T.textDim, textDecoration: 'underline', textUnderlineOffset: 2,
+            }}>Privacy Policy</button>
+            <button onClick={() => openExternal('https://www.sansayaw.org/support')} style={{
+              background: 'transparent', border: 0, padding: 0, cursor: 'pointer',
+              fontSize: 12, color: T.textDim, textDecoration: 'underline', textUnderlineOffset: 2,
+            }}>Support</button>
+          </div>
+
           <div style={{ marginTop: 16, fontSize: 11, color: T.textMute }}>
             sa&apos;nsayaw · made in Manila · {new Date().getFullYear()}
           </div>
