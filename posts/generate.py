@@ -42,7 +42,7 @@ import json
 import mimetypes
 import re
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from playwright.async_api import async_playwright
@@ -107,16 +107,26 @@ def _connect_db():
 
 def _week_rows(s):
     """
-    This week's classes, served from classes_display — which picks each
-    (date, studio)'s latest covering run rather than one single run, so a
-    studio that failed in the most recent run doesn't vanish from the post.
+    This week's upcoming classes — today through Sunday, excluding classes
+    later today that have already started — served from classes_display,
+    which picks each (date, studio)'s latest covering run rather than one
+    single run, so a studio that failed in the most recent run doesn't
+    vanish from the post.
     """
-    monday, sunday = _week_bounds()
-    return (
+    today = date.today()
+    _, sunday = _week_bounds(today)
+    rows = (
         s.table("classes_display").select("*")
-        .gte("date", monday.isoformat()).lte("date", sunday.isoformat())
+        .gte("date", today.isoformat()).lte("date", sunday.isoformat())
         .execute()
     ).data
+
+    today_iso = today.isoformat()
+    now_minutes = datetime.now().hour * 60 + datetime.now().minute
+    return [
+        r for r in rows
+        if r["date"] != today_iso or _start_minutes(r["time_range"]) >= now_minutes
+    ]
 
 
 def _row_location(studios, r):

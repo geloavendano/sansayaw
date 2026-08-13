@@ -13,6 +13,13 @@
       "runtimeArgs": ["run", "dev", "--", "--port", "3456"],
       "cwd": "web",
       "port": 3456
+    },
+    {
+      "name": "sansayaw-mobile",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "cwd": "mobile",
+      "port": 5174
     }
   ]
 }

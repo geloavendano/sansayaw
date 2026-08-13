@@ -1,0 +1,17 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+
+# Xcode user-specific state (the ios/ project itself is committed)
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/*.xcodeproj/xcuserdata/
+ios/App/Pods/
+ios/App/DerivedData/

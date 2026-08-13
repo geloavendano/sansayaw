@@ -391,15 +391,7 @@ function DesktopSidebar({ tab, changeTab, lastUpdated }) {
     }}>
       {/* Wordmark */}
       <div>
-        <h1 style={{
-          margin: 0,
-          fontFamily: T.headingFont, fontSize: 38, fontWeight: 700,
-          letterSpacing: '-0.03em', lineHeight: 1, color: T.text,
-        }}>
-          sa<span style={{
-            color: T.accent, textShadow: '0 0 20px ' + T.accent,
-          }}>'</span>nsayaw
-        </h1>
+        <img src="/wordmark.svg" alt="sa'nsayaw" style={{ height: 34, width: 'auto', display: 'block' }} />
         <p style={{
           margin: '8px 0 0',
           fontFamily: T.monoFont, fontSize: 11, fontWeight: 500,
@@ -549,14 +541,7 @@ function TopBar({ showWordmark = true, onFilter, filterCount, studioCount }) {
 }
 
 function Wordmark() {
-  return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-      <span style={{ fontFamily: T.headingFont, fontSize: 19, fontWeight: 600, letterSpacing: '-0.02em', color: T.text, lineHeight: 1 }}>
-        sa<span style={{ color: T.accent, fontWeight: 700, margin: '0 -1px', textShadow: '0 0 12px ' + T.accent }}>'</span>nsayaw
-      </span>
-      <span style={{ fontFamily: T.bodyFont, fontSize: 10.5, fontWeight: 500, color: T.textDim, letterSpacing: '.02em' }}>mnl</span>
-    </div>
-  );
+  return <img src="/wordmark.svg" alt="sa'nsayaw" style={{ height: 22, width: 'auto', display: 'block' }} />;
 }
 
 // ─────────────────────────────────────────────────────────────
