@@ -6,6 +6,7 @@ import { T } from '@/lib/theme';
 import { studioColor, studioLoc, studioName } from '@/lib/studios';
 
 const INSTAPAY_QR_URL = '/instapay-qr.jpg';
+const APP_STORE_URL   = 'https://apps.apple.com/ph/app/sansayaw-manila-dance-classes/id6801015922';
 
 // ── TAB ORDER (used for swipe direction) ─────────────────────
 const TAB_ORDER = ['calendar', 'search', 'contact'];
@@ -186,6 +187,16 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
     try { localStorage.setItem('sansayaw-filter', JSON.stringify([...enabledStudios])); } catch {}
   }, [enabledStudios]);
 
+  // App Store banner — dismiss persists across visits, same pattern as the studio filter
+  const [appStoreDismissed, setAppStoreDismissed] = useState(true); // default true until localStorage read, to avoid a flash on load
+  useEffect(() => {
+    try { setAppStoreDismissed(localStorage.getItem('sansayaw-appstore-dismissed') === '1'); } catch {}
+  }, []);
+  const dismissAppStore = () => {
+    setAppStoreDismissed(true);
+    try { localStorage.setItem('sansayaw-appstore-dismissed', '1'); } catch {}
+  };
+
   const [showFilter, setShowFilter]           = useState(false);
   const [showPicker, setShowPicker]           = useState(false);
   const [pickerMonth, setPickerMonth]         = useState(new Date(TODAY));
@@ -263,7 +274,10 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
 
       {/* Desktop sidebar */}
       {isDesktop && (
-        <DesktopSidebar tab={tab} changeTab={changeTab} lastUpdated={lastUpdated} />
+        <DesktopSidebar
+          tab={tab} changeTab={changeTab} lastUpdated={lastUpdated}
+          appStoreDismissed={appStoreDismissed} onDismissAppStore={dismissAppStore}
+        />
       )}
 
       {/* Content column */}
@@ -272,6 +286,11 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
         display: 'flex', flexDirection: 'column', minWidth: 0,
         zIndex: 1,
       }}>
+
+        {/* App Store banner — mobile only, sits above tab content so it persists across tab switches */}
+        {!isDesktop && !appStoreDismissed && (
+          <AppStoreBanner onDismiss={dismissAppStore} />
+        )}
 
         {/* Animated tab content — key changes on tab switch, triggering remount + animation */}
         <div key={tab} style={{
@@ -373,9 +392,88 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// APP STORE BANNER
+// ─────────────────────────────────────────────────────────────
+// Mobile: an inset, closeable card above the top bar.
+function AppStoreBanner({ onDismiss }) {
+  return (
+    <div style={{ padding: '12px 14px 0', flex: '0 0 auto' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10,
+        padding: '10px 12px', borderRadius: T.radius + 4,
+        background: T.panelSolid, border: '1px solid ' + hexA(T.accent, 0.28),
+      }}>
+        <button onClick={onDismiss} aria-label="Dismiss" style={{
+          flex: '0 0 auto', display: 'flex', padding: 5, margin: 0,
+          background: 'transparent', border: 0, color: T.textMute, cursor: 'pointer',
+        }}>
+          <Icon.x s={16} w={1.8} />
+        </button>
+        <img src="/app-icon.png" alt="" style={{
+          flex: '0 0 auto', width: 40, height: 40, borderRadius: 10,
+          border: '1px solid ' + T.border, display: 'block',
+        }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: '-0.01em', lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            sa&apos;nsayaw
+          </div>
+          <div style={{ fontSize: 11, color: T.textDim, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            Download on the App Store
+          </div>
+        </div>
+        <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" style={{
+          flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          padding: '7px 15px', borderRadius: T.pill, background: T.accent, color: T.accentOn,
+          fontSize: 11, fontWeight: 700, letterSpacing: '.02em', textDecoration: 'none',
+        }}>
+          GET
+        </a>
+      </div>
+    </div>
+  );
+}
+
+// Desktop: a card in the sidebar, right above "Last updated".
+function AppStoreBannerCard({ onDismiss }) {
+  return (
+    <div style={{
+      padding: '14px 16px', borderRadius: T.radius,
+      background: T.panel, border: '1px solid ' + hexA(T.accent, 0.3),
+      marginBottom: 14,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <img src="/app-icon.png" alt="" style={{
+          flex: '0 0 auto', width: 34, height: 34, borderRadius: 9,
+          border: '1px solid ' + T.border, display: 'block',
+        }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: '-0.01em' }}>Get the App</div>
+          <div style={{ fontSize: 11.5, color: T.textDim, marginTop: 3, lineHeight: 1.5 }}>
+            Browse dance class schedules faster — sa&apos;nsayaw is now on the App Store.
+          </div>
+        </div>
+        <button onClick={onDismiss} aria-label="Dismiss" style={{
+          flex: '0 0 auto', display: 'flex', padding: 3, margin: '-3px -3px 0 0',
+          background: 'transparent', border: 0, color: T.textMute, cursor: 'pointer',
+        }}>
+          <Icon.x s={15} w={1.8} />
+        </button>
+      </div>
+      <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" style={{
+        marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '10px 0', borderRadius: T.pill, background: T.accent, color: T.accentOn,
+        fontSize: 12.5, fontWeight: 700, boxShadow: T.accentGlow, textDecoration: 'none',
+      }}>
+        Download on the App Store
+      </a>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // DESKTOP SIDEBAR — editorial / brochure style
 // ─────────────────────────────────────────────────────────────
-function DesktopSidebar({ tab, changeTab, lastUpdated }) {
+function DesktopSidebar({ tab, changeTab, lastUpdated, appStoreDismissed, onDismissAppStore }) {
   const items = [
     { id: 'calendar', label: 'Calendar', sub: 'Browse by date',  I: Icon.cal    },
     { id: 'search',   label: 'Search',   sub: 'Find a class',    I: Icon.search },
@@ -448,6 +546,11 @@ function DesktopSidebar({ tab, changeTab, lastUpdated }) {
 
       {/* Spacer */}
       <div style={{ flex: 1 }} />
+
+      {/* App Store banner */}
+      {!appStoreDismissed && (
+        <AppStoreBannerCard onDismiss={onDismissAppStore} />
+      )}
 
       {/* Last updated */}
       {lastUpdated && (
