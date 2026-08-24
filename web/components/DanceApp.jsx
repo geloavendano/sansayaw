@@ -187,14 +187,16 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
     try { localStorage.setItem('sansayaw-filter', JSON.stringify([...enabledStudios])); } catch {}
   }, [enabledStudios]);
 
-  // App Store banner — dismiss persists across visits, same pattern as the studio filter
-  const [appStoreDismissed, setAppStoreDismissed] = useState(true); // default true until localStorage read, to avoid a flash on load
+  // App Store banner (mobile only — desktop always shows it, not closeable).
+  // sessionStorage, not localStorage: dismissing should only last this
+  // browser session, and the banner should come back on the next visit.
+  const [appStoreDismissed, setAppStoreDismissed] = useState(true); // default true until sessionStorage read, to avoid a flash on load
   useEffect(() => {
-    try { setAppStoreDismissed(localStorage.getItem('sansayaw-appstore-dismissed') === '1'); } catch {}
+    try { setAppStoreDismissed(sessionStorage.getItem('sansayaw-appstore-dismissed') === '1'); } catch {}
   }, []);
   const dismissAppStore = () => {
     setAppStoreDismissed(true);
-    try { localStorage.setItem('sansayaw-appstore-dismissed', '1'); } catch {}
+    try { sessionStorage.setItem('sansayaw-appstore-dismissed', '1'); } catch {}
   };
 
   const [showFilter, setShowFilter]           = useState(false);
@@ -274,10 +276,7 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
 
       {/* Desktop sidebar */}
       {isDesktop && (
-        <DesktopSidebar
-          tab={tab} changeTab={changeTab} lastUpdated={lastUpdated}
-          appStoreDismissed={appStoreDismissed} onDismissAppStore={dismissAppStore}
-        />
+        <DesktopSidebar tab={tab} changeTab={changeTab} lastUpdated={lastUpdated} />
       )}
 
       {/* Content column */}
@@ -317,7 +316,10 @@ export default function DanceApp({ studios, instrs, classes, lastUpdated }) {
             />
           )}
           {tab === 'contact' && (
-            <ContactTab isDesktop={isDesktop} lastUpdated={lastUpdated} studios={studios} />
+            <ContactTab
+              isDesktop={isDesktop} lastUpdated={lastUpdated} studios={studios}
+              appStoreDismissed={appStoreDismissed} onDismissAppStore={dismissAppStore}
+            />
           )}
         </div>
 
@@ -433,7 +435,9 @@ function AppStoreBanner({ onDismiss }) {
   );
 }
 
-// Desktop: a card in the sidebar, right above "Last updated".
+// Card style: the sidebar (desktop, permanent) and the About page reuse this.
+// onDismiss is optional — pass it to show a close button (mobile only); omit
+// it for a permanent placement (desktop is never closeable).
 function AppStoreBannerCard({ onDismiss }) {
   return (
     <div style={{
@@ -452,12 +456,14 @@ function AppStoreBannerCard({ onDismiss }) {
             Browse dance class schedules faster — sa&apos;nsayaw is now on the App Store.
           </div>
         </div>
-        <button onClick={onDismiss} aria-label="Dismiss" style={{
-          flex: '0 0 auto', display: 'flex', padding: 3, margin: '-3px -3px 0 0',
-          background: 'transparent', border: 0, color: T.textMute, cursor: 'pointer',
-        }}>
-          <Icon.x s={15} w={1.8} />
-        </button>
+        {onDismiss && (
+          <button onClick={onDismiss} aria-label="Dismiss" style={{
+            flex: '0 0 auto', display: 'flex', padding: 3, margin: '-3px -3px 0 0',
+            background: 'transparent', border: 0, color: T.textMute, cursor: 'pointer',
+          }}>
+            <Icon.x s={15} w={1.8} />
+          </button>
+        )}
       </div>
       <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" style={{
         marginTop: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -473,7 +479,7 @@ function AppStoreBannerCard({ onDismiss }) {
 // ─────────────────────────────────────────────────────────────
 // DESKTOP SIDEBAR — editorial / brochure style
 // ─────────────────────────────────────────────────────────────
-function DesktopSidebar({ tab, changeTab, lastUpdated, appStoreDismissed, onDismissAppStore }) {
+function DesktopSidebar({ tab, changeTab, lastUpdated }) {
   const items = [
     { id: 'calendar', label: 'Calendar', sub: 'Browse by date',  I: Icon.cal    },
     { id: 'search',   label: 'Search',   sub: 'Find a class',    I: Icon.search },
@@ -547,10 +553,8 @@ function DesktopSidebar({ tab, changeTab, lastUpdated, appStoreDismissed, onDism
       {/* Spacer */}
       <div style={{ flex: 1 }} />
 
-      {/* App Store banner */}
-      {!appStoreDismissed && (
-        <AppStoreBannerCard onDismiss={onDismissAppStore} />
-      )}
+      {/* App Store banner — always shown on desktop, not closeable */}
+      <AppStoreBannerCard />
 
       {/* Last updated */}
       {lastUpdated && (
@@ -1264,7 +1268,7 @@ function StudioListRow({ studio, last }) {
   );
 }
 
-function ContactTab({ isDesktop, lastUpdated, studios }) {
+function ContactTab({ isDesktop, lastUpdated, studios, appStoreDismissed, onDismissAppStore }) {
   const studioGroups = useMemo(() => groupStudiosByName(studios || []), [studios]);
 
   return (
@@ -1347,6 +1351,14 @@ function ContactTab({ isDesktop, lastUpdated, studios }) {
             Made in 2026 by a small crew of Metro Manila dancers who kept missing classes
             because schedules lived in stories that disappeared in 24 hours. Not affiliated
             with any studio. Always double-check class details with the studio before going.
+          </div>
+
+          <div style={{ marginTop: 18 }}>
+            {isDesktop ? (
+              <AppStoreBannerCard />
+            ) : !appStoreDismissed && (
+              <AppStoreBannerCard onDismiss={onDismissAppStore} />
+            )}
           </div>
 
           {lastUpdated && (
