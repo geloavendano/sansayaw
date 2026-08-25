@@ -125,7 +125,18 @@ def _parse_classes(lines, date_str):
 
 
 async def _cell_dates(page):
-    """Return list of (idx, ISO-date) for all gridcells that have a data-date."""
+    """Return list of (idx, ISO-date) for all gridcells that have a data-date.
+
+    Wix's calendar widget writes the data-date attribute with a 0-indexed
+    month (JS Date.getMonth() convention: Jan=0 ... Dec=11), while every
+    other date on the page — including the panel that actually opens when
+    you click the cell — uses normal 1-indexed months. A cell attributed
+    data-date="2026-7-25" opens the panel for August 25, not July 25;
+    confirmed live against the real site across multiple dates. Left
+    uncorrected, this both mislabeled every scraped class by a month and
+    inflated the "how many weeks behind is the calendar" math elsewhere in
+    this file, causing the scraper to land on the wrong week entirely.
+    """
     grid_cells = page.locator('[role="gridcell"]')
     n = await grid_cells.count()
     result = []
@@ -136,7 +147,12 @@ async def _cell_dates(page):
             continue
         parts = data_date.split("-")
         if len(parts) == 3:
-            result.append((idx, f"{parts[0]}-{int(parts[1]):02d}-{int(parts[2]):02d}"))
+            year, month0, day = int(parts[0]), int(parts[1]), int(parts[2])
+            month = month0 + 1
+            if month > 12:
+                month -= 12
+                year += 1
+            result.append((idx, f"{year}-{month:02d}-{day:02d}"))
     return result
 
 
