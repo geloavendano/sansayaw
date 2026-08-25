@@ -1,4 +1,4 @@
-import { useRef, useState, type TouchEvent } from 'react';
+import { useEffect, useRef, useState, type TouchEvent } from 'react';
 import { T } from '../lib/theme';
 import { shareICS } from '../lib/ics';
 import { openExternal } from '../lib/links';
@@ -20,11 +20,35 @@ interface ClassDetailSheetProps {
   onClose: () => void;
 }
 
+type Phase = 'enter' | 'open' | 'exit';
+const TRANSITION_MS = 300;
+
 export function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }: ClassDetailSheetProps) {
   const info = instrInfo || ({} as Instructor);
+  const [phase, setPhase] = useState<Phase>('enter');
   const [dragY, setDragY] = useState(0);
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  // Mount already-offscreen (phase 'enter'), then flip to 'open' a frame
+  // later so the browser has painted the offscreen position first and the
+  // transform change to 0 actually transitions instead of snapping.
+  useEffect(() => {
+    const raf1 = requestAnimationFrame(() => {
+      const raf2 = requestAnimationFrame(() => setPhase('open'));
+      return () => cancelAnimationFrame(raf2);
+    });
+    return () => cancelAnimationFrame(raf1);
+  }, []);
+
+  // Plays the slide-down/fade-out before actually unmounting (onClose),
+  // instead of vanishing instantly — used by the backdrop, the close
+  // button, and a completed drag-to-dismiss alike.
+  const requestClose = () => {
+    if (phase === 'exit') return;
+    setPhase('exit');
+    setTimeout(onClose, TRANSITION_MS);
+  };
 
   const handleTouchStart = (e: TouchEvent) => {
     startRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -38,7 +62,7 @@ export function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }: Class
     if (dy > 0 && dy > Math.abs(dx)) setDragY(dy);
   };
   const handleTouchEnd = () => {
-    if (dragY > 80) { onClose(); } else { setDragY(0); }
+    if (dragY > 80) { requestClose(); } else { setDragY(0); }
     startRef.current = null;
   };
 
@@ -81,16 +105,24 @@ export function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }: Class
   const label1 = { fontSize: 13, fontWeight: 500 };
   const label2 = { fontSize: 11.5, color: T.textDim, marginTop: 1, fontFamily: T.monoFont };
 
+  const offscreen = phase !== 'open';
+  const sheetTransform = {
+    transform: offscreen ? 'translateY(100%)' : `translateY(${dragY}px)`,
+    transition: (offscreen || dragY === 0) ? `transform ${TRANSITION_MS}ms cubic-bezier(.2,.7,.3,1)` : 'none',
+  };
+
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 60, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-      <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }} />
+      <div onClick={requestClose} style={{
+        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+        opacity: offscreen ? 0 : 1, transition: `opacity ${TRANSITION_MS}ms ease`,
+      }} />
       <div
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         style={{
-          transform: `translateY(${dragY}px)`,
-          transition: dragY === 0 ? 'transform .3s cubic-bezier(.2,.7,.3,1)' : 'none',
+          ...sheetTransform,
           willChange: 'transform',
         }}
       >
@@ -100,12 +132,11 @@ export function ClassDetailSheet({ c, studio, instrInfo, TODAY, onClose }: Class
           borderTopLeftRadius: 22, borderTopRightRadius: 22,
           maxHeight: '94vh', display: 'flex', flexDirection: 'column',
           boxShadow: '0 -20px 60px rgba(0,0,0,0.5)',
-          animation: 'snsIn .26s cubic-bezier(.2,.7,.3,1)',
         }}>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px', flex: '0 0 auto' }}>
             <div style={{ width: 40, height: 4, borderRadius: 2, background: T.borderStrong }} />
           </div>
-          <button onClick={onClose} aria-label="Close" style={{
+          <button onClick={requestClose} aria-label="Close" style={{
             position: 'absolute', top: 14, right: 14, zIndex: 2,
             background: 'transparent', border: 0,
             color: T.textDim, cursor: 'pointer', padding: 4,

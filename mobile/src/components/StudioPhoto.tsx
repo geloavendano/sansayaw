@@ -1,14 +1,16 @@
+import { useCachedImage } from '../hooks/useCachedImage';
 import { T } from '../lib/theme';
 import { studioLoc, studioName } from '../lib/studios';
 import type { Studio } from '../types';
 import { hexA, initials, placeholderGrad } from '../utils/style';
 
 export function StudioPhoto({ studio }: { studio: Studio | undefined }) {
+  const cachedSrc = useCachedImage(studio?.photo_url);
   if (studio?.photo_url) {
     return (
       <div style={{
         width: '100%', height: 152, borderRadius: T.radius,
-        backgroundImage: `url(${studio.photo_url})`,
+        backgroundImage: `url(${cachedSrc ?? studio.photo_url})`,
         backgroundSize: 'cover', backgroundPosition: 'center',
         border: '1px solid ' + T.border,
       }} />

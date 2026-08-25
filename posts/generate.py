@@ -7,6 +7,7 @@ Usage:
     python posts/generate.py --from-db                  # list instructors with classes this week
     python posts/generate.py --from-db "Caila Santos"   # generate straight from Supabase
     python posts/generate.py --from-db "Caila Santos" "Rex Villanueva" --format portrait
+    python posts/generate.py --today                    # one post per instructor teaching today
     python posts/generate.py --tag                      # list genres with classes this week
     python posts/generate.py --tag "K-POP"               # every K-POP class this week, all studios
     python posts/generate.py --tag "K-POP" "Heels"
@@ -141,11 +142,42 @@ def _row_start(r):
     return re.split(r"\s*[–\-]\s*", r["time_range"] or "", maxsplit=1)[0].strip()
 
 
-def _fetch_from_db(names, week_label):
-    """Build choreographer dicts from the latest scrape run in Supabase."""
-    s = _connect_db()
-    rows = _week_rows(s)
+def _person_name(key, instructors):
+    rec = instructors.get(key) if isinstance(key, int) else None
+    return (rec and (rec.get("display_name") or rec.get("name"))) or str(key)
 
+
+def _studios_of(cls, studios):
+    return sorted({studios.get(r["studio_id"], {}).get("name", r["studio_id"]) for r in cls})
+
+
+def _build_person(key, cls, instructors, studios):
+    """Build a choreographer dict for one instructor from their class rows."""
+    cls = sorted(cls, key=lambda r: (r["date"], _start_minutes(r["time_range"])))
+    classes = [{
+        "day": date.fromisoformat(r["date"]).strftime("%a"),
+        "time": _row_start(r),
+        "name": r["class_name"],
+        "location": _row_location(studios, r),
+    } for r in cls]
+
+    rec = instructors.get(key, {}) if isinstance(key, int) else {}
+    handle = (rec.get("instagram") or "").strip()
+    if handle.startswith(("http://", "https://")):
+        handle = handle.rstrip("/").rsplit("/", 1)[-1]
+    if handle and not handle.startswith("@"):
+        handle = f"@{handle}"
+
+    return {
+        "name": _person_name(key, instructors),
+        "handle": handle,
+        "bio": rec.get("bio") or "Choreographer",
+        "photo": rec.get("photo_url"),
+        "classes": classes,
+    }
+
+
+def _fetch_studios_and_instructors(s):
     studios = {r["id"]: r for r in s.table("studios").select("id, name, branch").execute().data}
     instructors = {
         r["id"]: r
@@ -153,28 +185,33 @@ def _fetch_from_db(names, week_label):
         .select("id, name, display_name, bio, instagram, photo_url")
         .execute().data
     }
+    return studios, instructors
 
-    # Group this week's classes by instructor identity (id), falling back to
-    # the raw name for rows scraped before the alias migration.
+
+def _group_by_instructor(rows):
+    """Group class rows by instructor identity (id), falling back to the
+    raw name for rows scraped before the alias migration."""
     by_key = {}
     for r in rows:
         key = r.get("instructor_id") or r.get("instructor")
         if key:
             by_key.setdefault(key, []).append(r)
+    return by_key
 
-    def person_name(key):
-        rec = instructors.get(key) if isinstance(key, int) else None
-        return (rec and (rec.get("display_name") or rec.get("name"))) or str(key)
 
-    def studios_of(cls):
-        return sorted({studios.get(r["studio_id"], {}).get("name", r["studio_id"]) for r in cls})
+def _fetch_from_db(names, week_label):
+    """Build choreographer dicts from the latest scrape run in Supabase."""
+    s = _connect_db()
+    rows = _week_rows(s)
+    studios, instructors = _fetch_studios_and_instructors(s)
+    by_key = _group_by_instructor(rows)
 
     # No names given → list who's available and exit
     if not names:
         print(f"Instructors with classes this week ({week_label}):\n")
         for key, cls in sorted(by_key.items(), key=lambda kv: -len(kv[1])):
             n = len(cls)
-            print(f"  {person_name(key)}  ({n} class{'es' if n != 1 else ''} · {', '.join(studios_of(cls))})")
+            print(f"  {_person_name(key, instructors)}  ({n} class{'es' if n != 1 else ''} · {', '.join(_studios_of(cls, studios))})")
         sys.exit(0)
 
     people = []
@@ -184,7 +221,7 @@ def _fetch_from_db(names, week_label):
         if name.isdigit() and int(name) in by_key:
             matches = [int(name)]
         else:
-            matches = [k for k in by_key if person_name(k).lower() == name.lower()]
+            matches = [k for k in by_key if _person_name(k, instructors).lower() == name.lower()]
         if not matches:
             print(f"  WARNING: no classes this week for '{name}' — skipping")
             continue
@@ -192,31 +229,56 @@ def _fetch_from_db(names, week_label):
             print(f"  NOTE: '{name}' matches {len(matches)} separate instructors — generating one post each")
 
         for key in matches:
-            cls = sorted(by_key[key], key=lambda r: (r["date"], _start_minutes(r["time_range"])))
-            classes = [{
-                "day": date.fromisoformat(r["date"]).strftime("%a"),
-                "time": _row_start(r),
-                "name": r["class_name"],
-                "location": _row_location(studios, r),
-            } for r in cls]
-
-            rec = instructors.get(key, {}) if isinstance(key, int) else {}
-            handle = (rec.get("instagram") or "").strip()
-            if handle.startswith(("http://", "https://")):
-                handle = handle.rstrip("/").rsplit("/", 1)[-1]
-            if handle and not handle.startswith("@"):
-                handle = f"@{handle}"
-
-            person = {
-                "name": person_name(key),
-                "handle": handle,
-                "bio": rec.get("bio") or "Choreographer",
-                "photo": rec.get("photo_url"),
-                "classes": classes,
-            }
+            person = _build_person(key, by_key[key], instructors, studios)
             if len(matches) > 1:
-                person["slug_suffix"] = studios_of(cls)[0]
+                person["slug_suffix"] = _studios_of(by_key[key], studios)[0]
             people.append(person)
+    return people
+
+
+def _today_rows(s):
+    """
+    Every class scheduled today, the full day — served from classes_display
+    for the same run-resilience as _week_rows. Unlike _week_rows, this does
+    NOT drop classes that have already started: it's only used to decide
+    *which* instructors are teaching today, not what to put on their card,
+    so someone whose only class today already started still counts.
+    """
+    today_iso = date.today().isoformat()
+    return (
+        s.table("classes_display").select("*")
+        .eq("date", today_iso)
+        .execute()
+    ).data
+
+
+def _fetch_today():
+    """
+    One card per instructor teaching today — but each card shows that
+    instructor's full upcoming schedule for the rest of the week (same as
+    --from-db), not just today. _today_rows only decides who's included.
+    """
+    s = _connect_db()
+    week_rows = _week_rows(s)
+    today_rows = _today_rows(s)
+    studios, instructors = _fetch_studios_and_instructors(s)
+
+    today_keys = _group_by_instructor(today_rows).keys()
+    by_key = {k: v for k, v in _group_by_instructor(week_rows).items() if k in today_keys}
+
+    # The same display name can belong to distinct instructor ids (after an
+    # unmerge) — give those a slug suffix so output filenames don't collide.
+    name_counts = {}
+    for key in by_key:
+        name = _person_name(key, instructors)
+        name_counts[name] = name_counts.get(name, 0) + 1
+
+    people = []
+    for key, cls in sorted(by_key.items(), key=lambda kv: _person_name(kv[0], instructors)):
+        person = _build_person(key, cls, instructors, studios)
+        if name_counts[person["name"]] > 1:
+            person["slug_suffix"] = _studios_of(cls, studios)[0]
+        people.append(person)
     return people
 
 
@@ -324,6 +386,8 @@ async def main():
     parser.add_argument("input", nargs="?", help="input JSON file (default: posts/input.json)")
     parser.add_argument("--from-db", nargs="*", metavar="NAME", default=None,
                         help="pull this week's classes from Supabase; no names = list available instructors")
+    parser.add_argument("--today", action="store_true",
+                        help="generate one post per instructor teaching today, across all studios")
     parser.add_argument("--tag", nargs="*", metavar="GENRE", default=None,
                         help="post of every class this week tagged with this genre, across all studios; no tags = list available genres")
     parser.add_argument("--search", nargs="+", metavar="TERM", default=None,
@@ -334,7 +398,19 @@ async def main():
 
     monday, sunday = _week_bounds()
 
-    if args.search is not None:
+    if args.today:
+        week_label = _week_label(monday, sunday)
+        choreographers = _fetch_today()
+        default_format = args.format or "overlay"
+        input_dir = POSTS_DIR
+        if not choreographers:
+            sys.exit("No classes today — nothing to generate.")
+        print(f"{len(choreographers)} instructor(s) teaching today:")
+        for p in choreographers:
+            n = len(p["classes"])
+            print(f"  {p['name']}  ({n} class{'es' if n != 1 else ''})")
+        print()
+    elif args.search is not None:
         week_label = _week_label(monday, sunday)
         choreographers = _fetch_by_search(args.search, week_label)
         default_format = args.format or "overlay"

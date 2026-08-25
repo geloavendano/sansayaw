@@ -11,10 +11,11 @@ import { SearchTab } from './components/SearchTab';
 import { TAB_ORDER, type Tab } from './components/App.types';
 import { useAppData } from './hooks/useAppData';
 import { track } from './lib/analytics';
+import { prefetchImages } from './lib/imageCache';
 import { T } from './lib/theme';
 import { loadFilter, saveFilter } from './lib/prefs';
 import type { ClassRow, InstructorMap, Studio } from './types';
-import { isoOf, todayLocal } from './utils/date';
+import { addDays, isoOf, todayLocal } from './utils/date';
 
 export default function App() {
   const { data, loading, error } = useAppData();
@@ -69,6 +70,25 @@ interface DanceAppProps {
 
 function DanceApp({ studios, instrs, classes, lastUpdated }: DanceAppProps) {
   const TODAY = useMemo(todayLocal, []);
+
+  // Warm the on-device image cache right away for studio photos (small,
+  // fixed set) and instructors teaching in the next week (the ones a user
+  // is actually likely to tap into soon) — so by the time someone opens a
+  // class detail sheet, the photo is usually already local instead of
+  // waiting on the network. See lib/imageCache.ts.
+  useEffect(() => {
+    const studioUrls = studios.map(s => s.photo_url);
+    const todayIso = isoOf(TODAY);
+    const soonIso = isoOf(addDays(TODAY, 7));
+    const nearInstructorIds = new Set(
+      classes
+        .filter(c => c.date >= todayIso && c.date <= soonIso && c.instructor_id != null)
+        .map(c => c.instructor_id as number)
+    );
+    const instructorUrls = [...nearInstructorIds].map(id => instrs[id]?.photo_url);
+    prefetchImages([...studioUrls, ...instructorUrls]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studios, classes, instrs]);
 
   const [tab, setTab] = useState<Tab>('calendar');
   const [slideDir, setSlideDir] = useState(1); // 1 = enter from right, -1 = enter from left
@@ -205,10 +225,6 @@ function DanceApp({ studios, instrs, classes, lastUpdated }: DanceAppProps) {
         @keyframes slideInLeft {
           from { opacity: 0; transform: translateX(-36px); }
           to   { opacity: 1; transform: translateX(0); }
-        }
-        @keyframes snsIn {
-          from { transform: translateY(24px); opacity: 0; }
-          to   { transform: translateY(0);    opacity: 1; }
         }
         @keyframes blobDrift1 {
           0%,100% { transform: translate(0%,    0%)   scale(1);    }
